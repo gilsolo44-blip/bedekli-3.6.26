@@ -568,6 +568,7 @@ function step4_schema(rawDefects) {
       category:      catObj.code,
       categoryLabel: catObj.label,
       workType:      inferWorkType(d.rec || desc),
+      bbox:          validateBbox(d.bbox),
     };
   });
 }
@@ -1390,4 +1391,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema };

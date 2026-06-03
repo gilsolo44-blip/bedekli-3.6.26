@@ -37,5 +37,18 @@ t('detectVisualPages handles missing/empty meta', () => {
   assert.deepStrictEqual(S.detectVisualPages([]), []);
 });
 
+t('step4_schema passes through valid bbox', () => {
+  const out = S.step4_schema([{ t:'סדק', ds:'סדק בקיר', s:'high', p:'5', bbox:[10,10,500,500], area:'סלון' }]);
+  assert.deepStrictEqual(out[0].bbox, [10,10,500,500]);
+});
+t('step4_schema nullifies invalid bbox', () => {
+  const out = S.step4_schema([{ t:'סדק', ds:'x', s:'high', p:'5', bbox:[1,1,2000,2], area:'סלון' }]);
+  assert.strictEqual(out[0].bbox, null);
+});
+t('step4_schema defaults bbox to null when absent', () => {
+  const out = S.step4_schema([{ t:'סדק', ds:'x', s:'high', p:'5', area:'סלון' }]);
+  assert.strictEqual(out[0].bbox, null);
+});
+
 console.log(`\n${pass}/${pass+fail} PASS`);
 process.exit(fail ? 1 : 0);
