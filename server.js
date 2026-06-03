@@ -749,6 +749,67 @@ function geminiCall(model, system, user, callback, attempt = 1) {
   });
 }
 
+// ── Gemini Files API ─────────────────────────────────────────────────────────
+// Resumable upload of a base64 PDF. Returns { uri, name } via callback.
+function geminiUploadFile(pdfBase64, callback) {
+  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+  const buf = Buffer.from(pdfBase64, 'base64');
+  const startBody = JSON.stringify({ file: { display_name: 'inspection.pdf' } });
+  const startOpts = {
+    hostname: 'generativelanguage.googleapis.com',
+    path: `/upload/v1beta/files?key=${GEMINI_KEY}`,
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Length': buf.length,
+      'X-Goog-Upload-Header-Content-Type': 'application/pdf',
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(startBody),
+    },
+  };
+  const startReq = https.request(startOpts, (resp) => {
+    const uploadUrl = resp.headers['x-goog-upload-url'];
+    resp.on('data', () => {}); resp.on('end', () => {
+      if (!uploadUrl) return callback(new Error('Files API: no upload URL (status ' + resp.statusCode + ')'));
+      const u = new URL(uploadUrl);
+      const upOpts = {
+        hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+        headers: {
+          'Content-Length': buf.length,
+          'X-Goog-Upload-Offset': 0,
+          'X-Goog-Upload-Command': 'upload, finalize',
+        },
+      };
+      const upReq = https.request(upOpts, (r2) => {
+        let body = ''; r2.on('data', c => body += c); r2.on('end', () => {
+          try {
+            const js = JSON.parse(body);
+            if (!js.file || !js.file.uri) return callback(new Error('Files API finalize failed: ' + body.slice(0, 120)));
+            callback(null, { uri: js.file.uri, name: js.file.name });
+          } catch (e) { callback(e); }
+        });
+      });
+      upReq.on('error', callback);
+      upReq.write(buf); upReq.end();
+    });
+  });
+  startReq.on('error', callback);
+  startReq.write(startBody); startReq.end();
+}
+
+// Proactive cleanup — best-effort, errors ignored.
+function geminiDeleteFile(name, callback) {
+  if (!GEMINI_KEY || !name) return callback && callback();
+  const opts = {
+    hostname: 'generativelanguage.googleapis.com',
+    path: `/v1beta/${name}?key=${GEMINI_KEY}`, method: 'DELETE',
+  };
+  const req = https.request(opts, (r) => { r.on('data', () => {}); r.on('end', () => callback && callback()); });
+  req.on('error', () => callback && callback());
+  req.end();
+}
+
 // ── Provider: OpenRouter ─────────────────────────────────────────────────────
 
 function openrouterCall(_, system, user, callback, attempt = 1) {
@@ -1414,4 +1475,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile };
