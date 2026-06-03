@@ -888,6 +888,9 @@ async function handleFile(file){
   setStep(5,'טוען קובץ...',0);
   try{
     const buf=await file.arrayBuffer();
+    // PDF bytes → base64 for the vision path (compute BEFORE getDocument, which may detach buf)
+    let pdfBase64='';
+    try{const bytes=new Uint8Array(buf);let bin='';const CH=0x8000;for(let k=0;k<bytes.length;k+=CH){bin+=String.fromCharCode.apply(null,bytes.subarray(k,k+CH));}pdfBase64=btoa(bin);}catch(e){pdfBase64='';}
     setStep(12,'פותח PDF...',0);
     const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf),disableFontFace:true,standardFontDataUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/'}).promise;
     const tot=pdf.numPages;let done=0;const t0=Date.now();
@@ -907,7 +910,7 @@ async function handleFile(file){
       }));
     }
     setStep(48,'מחלץ טקסט מהדוח...',1);
-    let pdfText='',sparsePages=0;
+    let pdfText='',sparsePages=0;const pageMeta=[];
     for(let pn=1;pn<=tot;pn++){
       const pg=await pdf.getPage(pn);
       const tc=await pg.getTextContent();
@@ -923,6 +926,9 @@ async function handleFile(file){
         .join('\n');
       if(pageText.trim().length<50)sparsePages++;
       pdfText+=`\n--- עמוד ${pn} ---\n${pageText}\n`;
+      let hasImages=false;
+      try{const ops=await pg.getOperatorList();const IMG=pdfjsLib.OPS.paintImageXObject,INL=pdfjsLib.OPS.paintInlineImageXObject;hasImages=ops.fnArray.some(fn=>fn===IMG||fn===INL);}catch(e){}
+      pageMeta.push({page:pn,hasTextLayer:pageText.trim().length>0,hasImages});
     }
     if(sparsePages>0)sessionStorage.setItem('bdkl_ocr_warn',JSON.stringify({count:sparsePages,total:tot}));
     setStep(50,`שולח ל-AI (${tot} עמודים)...`,2);
@@ -941,7 +947,7 @@ async function handleFile(file){
       res=await fetch('/api/analyze-simple',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({pdfText,propertyType:propType}),
+        body:JSON.stringify({pdfText,propertyType:propType,pdfBase64,pageMeta}),
         signal:ctrl.signal
       });
     }finally{
