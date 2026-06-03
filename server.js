@@ -59,6 +59,33 @@ const CEREBRAS_KEY   = process.env.CEREBRAS_API_KEY;
 const GEMINI_KEY     = process.env.GEMINI_API_KEY;
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
+// ── Vision (multimodal) config ───────────────────────────────────────────────
+const VISION = {
+  enabled: process.env.VISION_ENABLED !== '0',
+  model: process.env.VISION_MODEL || 'gemini-2.5-flash', // → 'gemini-2.5-pro' for paid tier
+  maxVisualPages: parseInt(process.env.VISION_MAX_PAGES) || 30,
+};
+
+// Validate a Gemini bounding box [ymin,xmin,ymax,xmax] normalized 0-1000.
+function validateBbox(b) {
+  if (!Array.isArray(b) || b.length !== 4) return null;
+  const nums = b.map(Number);
+  if (nums.some(v => !Number.isFinite(v))) return null;
+  const [ymin, xmin, ymax, xmax] = nums;
+  for (const v of nums) { if (v < 0 || v > 1000) return null; }
+  if (ymin >= ymax || xmin >= xmax) return null;
+  return [ymin, xmin, ymax, xmax];
+}
+
+// From client page metadata, return the page numbers that need vision.
+function detectVisualPages(pageMeta) {
+  if (!Array.isArray(pageMeta)) return [];
+  return pageMeta
+    .filter(p => p && (p.hasTextLayer === false || p.hasImages === true))
+    .map(p => p.page)
+    .filter(n => Number.isFinite(n));
+}
+
 // ── Auth fail-fast ────────────────────────────────────────────────────────────
 if (!GROQ_KEYS.length && !CEREBRAS_KEY && !GEMINI_KEY && !OPENROUTER_KEY) {
   console.error('[AUTH_LOCKED] ✗ No API keys found — check .env.local');
@@ -1363,4 +1390,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline };
+module.exports = { pipeline, validateBbox, detectVisualPages };
