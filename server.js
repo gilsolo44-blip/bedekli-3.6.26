@@ -810,6 +810,46 @@ function geminiDeleteFile(name, callback) {
   req.end();
 }
 
+const VISION_PROMPT = `אתה מנתח דוח בדק-בית בעברית מתוך קובץ PDF (כולל עמודים סרוקים וצילומים).
+התמקד בעמודים הבאים: {PAGES}.
+חלץ כל ליקוי שאתה מזהה — מטקסט סרוק (OCR) ומתוך הצילומים עצמם (סדק, רטיבות, עובש, נזק).
+לכל ליקוי, אם יש צילום רלוונטי בעמוד, החזר bounding box שלו בקואורדינטות מנורמלות 0-1000 בפורמט [ymin,xmin,ymax,xmax]; אם אין צילום — bbox=null.
+החזר JSON בלבד, ללא backticks, במבנה:
+{"defects":[{"t":"כותרת קצרה","ds":"תיאור","s":"critical|high|medium|low|cosmetic","p":מספר_עמוד,"c":"עלות אם מופיעה","rec":"פעולה נדרשת","q":"ציטוט/מהתמונה","area":"שם החדר/אזור","bbox":[ymin,xmin,ymax,xmax]}]}`;
+
+// Extract defects from a PDF already uploaded to Files API. Gemini-only (Files API).
+function geminiVisionExtract(fileUri, visualPages, propertyType, callback, attempt = 1) {
+  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+  const prompt = VISION_PROMPT.replace('{PAGES}', visualPages.join(', '));
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts: [
+      { fileData: { fileUri, mimeType: 'application/pdf' } },
+      { text: prompt },
+    ]}],
+    generationConfig: { temperature: 0, maxOutputTokens: 8192 },
+  });
+  postJSON({
+    hostname: 'generativelanguage.googleapis.com',
+    path: `/v1beta/models/${VISION.model}:generateContent?key=${GEMINI_KEY}`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+  }, body, (err, status, text) => {
+    if (err) return callback(err);
+    if (status === 429 && attempt === 1) {
+      return setTimeout(() => geminiVisionExtract(fileUri, visualPages, propertyType, callback, 2), 8000);
+    }
+    if (status === 503 && attempt <= 2) {
+      return setTimeout(() => geminiVisionExtract(fileUri, visualPages, propertyType, callback, attempt + 1), 4000 * attempt);
+    }
+    if (status !== 200) return callback(new Error('Vision ' + status + ': ' + text.slice(0, 100)));
+    try {
+      const js = JSON.parse(text);
+      const out = js.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      callback(null, parseDefects(out));
+    } catch (e) { callback(e); }
+  });
+}
+
 // ── Provider: OpenRouter ─────────────────────────────────────────────────────
 
 function openrouterCall(_, system, user, callback, attempt = 1) {
@@ -1475,4 +1515,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract };
