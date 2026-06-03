@@ -70,5 +70,23 @@ t('mergeDefects keeps existing bbox over vision', () => {
   assert.deepStrictEqual(m[0].bbox, [1,1,2,2]);
 });
 
+t('visionPath returns [] synchronously when no visual pages', () => {
+  let called = false, errVal = 'unset', defsVal = 'unset';
+  S.visionPath(null, [{page:1,hasTextLayer:true,hasImages:false}], 'new', [], (err, defs) => {
+    called = true; errVal = err; defsVal = defs;
+  });
+  assert.strictEqual(called, true);      // synchronous short-circuit
+  assert.strictEqual(errVal, null);      // never an error
+  assert.deepStrictEqual(defsVal, []);   // empty result
+});
+t('visionPath returns [] synchronously when no pdfBase64', () => {
+  let called = false, defsVal = 'unset';
+  S.visionPath(null, [{page:1,hasTextLayer:false}], 'new', [], (err, defs) => {
+    called = true; defsVal = defs;
+  });
+  assert.strictEqual(called, true);
+  assert.deepStrictEqual(defsVal, []);
+});
+
 console.log(`\n${pass}/${pass+fail} PASS`);
 process.exit(fail ? 1 : 0);

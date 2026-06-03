@@ -850,6 +850,32 @@ function geminiVisionExtract(fileUri, visualPages, propertyType, callback, attem
   });
 }
 
+// Parallel vision path. Best-effort: NEVER calls callback(err) — always (null, defects).
+function visionPath(pdfBase64, pageMeta, propertyType, log, callback) {
+  if (!VISION.enabled || !pdfBase64) { log.push('[Vision] disabled or no PDF — skipped'); return callback(null, []); }
+  let visualPages = detectVisualPages(pageMeta);
+  if (!visualPages.length) { log.push('[Vision] 0 visual pages — skipped (0 quota)'); return callback(null, []); }
+  if (visualPages.length > VISION.maxVisualPages) {
+    const scanned = (pageMeta || []).filter(p => p.hasTextLayer === false).map(p => p.page);
+    const withImg = visualPages.filter(p => !scanned.includes(p));
+    visualPages = [...new Set([...scanned, ...withImg])].slice(0, VISION.maxVisualPages);
+    log.push(`[Vision] capped to ${VISION.maxVisualPages} pages (had more)`);
+  }
+  log.push(`[Vision] ${visualPages.length} visual pages — uploading PDF`);
+  geminiUploadFile(pdfBase64, (upErr, file) => {
+    if (upErr) { log.push('[Vision] ✗ upload: ' + upErr.message); return callback(null, []); }
+    log.push('[Vision] upload ok');
+    geminiVisionExtract(file.uri, visualPages, propertyType, (exErr, rawDefects) => {
+      geminiDeleteFile(file.name, () => {});
+      if (exErr) { log.push('[Vision] ✗ extract: ' + exErr.message); return callback(null, []); }
+      const defects = step4_schema(rawDefects || []);
+      const withBox = defects.filter(d => d.bbox).length;
+      log.push(`[Vision] ${defects.length} ליקויים, ${withBox} bbox`);
+      callback(null, defects);
+    });
+  });
+}
+
 // ── Provider: OpenRouter ─────────────────────────────────────────────────────
 
 function openrouterCall(_, system, user, callback, attempt = 1) {
@@ -1515,4 +1541,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath };
