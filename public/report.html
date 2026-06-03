@@ -1098,6 +1098,34 @@ function render(){
   el.innerHTML=(sev?sev.outerHTML:'')+html;
 }
 
+let _hydrateT=null;
+function scheduleHydrate(){clearTimeout(_hydrateT);_hydrateT=setTimeout(hydrateDefectPhotos,0);}
+// Fill defect-photo slots by cropping the page thumbnail at the vision bbox (idempotent).
+function hydrateDefectPhotos(){
+  document.querySelectorAll('.defect-photo-slot').forEach(slot=>{
+    if(slot.dataset.filled)return; slot.dataset.filled='1';
+    const bbox=(slot.dataset.bbox||'').split(',').map(Number);
+    if(bbox.length!==4||bbox.some(n=>!isFinite(n)))return;
+    const dataUrl=PIMGS[slot.dataset.page]; if(!dataUrl)return;
+    const img=new Image();
+    img.onload=()=>{
+      const [ymin,xmin,ymax,xmax]=bbox;
+      const sx=(xmin/1000)*img.width, sy=(ymin/1000)*img.height;
+      const sw=((xmax-xmin)/1000)*img.width, sh=((ymax-ymin)/1000)*img.height;
+      if(sw<=0||sh<=0)return;
+      const cv=document.createElement('canvas');
+      cv.width=Math.max(1,Math.round(sw)); cv.height=Math.max(1,Math.round(sh));
+      cv.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,cv.width,cv.height);
+      let out; try{out=cv.toDataURL('image/jpeg',0.7);}catch(e){return;}
+      const im=new Image();
+      im.src=out; im.className='defect-photo'; im.loading='lazy';
+      im.style.cssText='max-width:100%;border-radius:8px;margin-top:8px;display:block';
+      slot.appendChild(im);
+    };
+    img.onerror=()=>{};
+    img.src=dataUrl;
+  });
+}
 function card(d,i){
   const st=ST[d.id]||'pending',isDone=st==='done';
   const titleText=(()=>{const f=d.finding||d.title||'';return(f===d.area&&d.desc)?d.desc:f;})();
@@ -1123,6 +1151,8 @@ function card(d,i){
   const pageBtn=`<button class="ab page-btn${hasImg?'':' disabled-btn'}" onclick="event.stopPropagation();${hasImg?`showImg(${d.id})`:'void 0'}" title="${hasImg?'פתח עמוד בדוח':'תמונה לא זמינה'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>עמוד ${d.pageNum} בדוח</button>`;
 
   const ns=NT[d.id]?`<div class="note-saved">${esc(NT[d.id])}</div>`:'';
+  const hasBbox=Array.isArray(d.bbox)&&d.bbox.length===4&&!!PIMGS[d.pageNum];
+  if(hasBbox)scheduleHydrate();
   return`<div class="card ${SC2[d.sev]}${isDone?' done':''}" id="DC-${d.id}" style="animation-delay:${i*0.04}s">
     <div class="card-top" onclick="toggleCard(${d.id})">
       <div class="stc ${st}" onclick="event.stopPropagation();cycleStatus(${d.id})"></div>
@@ -1147,6 +1177,7 @@ function card(d,i){
     </div>
     <div class="card-exp" id="CE-${d.id}">
       ${srcEl}
+      ${hasBbox?`<div class="defect-photo-slot" id="PHOTO-${d.id}" data-bbox="${d.bbox.join(',')}" data-page="${d.pageNum}"></div>`:''}
       <div class="act-row">
         <button class="ab ok ${st==='done'?'on':''}" onclick="setStatus(${d.id},'done')">טופל</button>
         <button class="ab wa ${st==='partial'?'on':''}" onclick="setStatus(${d.id},'partial')">חלקית</button>
