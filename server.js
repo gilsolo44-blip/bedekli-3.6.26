@@ -1257,20 +1257,30 @@ function mergeDefects(textDefects, visionDefects) {
 
 // ── Pipeline Orchestrator ────────────────────────────────────────────────────
 
-function pipeline(pdfText, propertyType, callback) {
+function pipeline(pdfText, propertyType, opts, callback) {
+  if (typeof opts === 'function') { callback = opts; opts = {}; }
+  opts = opts || {};
+  const { pdfBase64 = null, pageMeta = null } = opts;
   groqKeyExhausted.clear();
   const t0 = Date.now();
   const fullLog = [];
   fullLog.push('=== ROUTING LOG ===');
 
-  // Final result cache — same PDF always returns same result
-  const finalCacheKey = `result_${pdfHash(pdfText)}_${propertyType || 'new'}`;
+  // Final result cache — same PDF always returns same result (vision-aware key)
+  const finalCacheKey = `result_${pdfHash(pdfText)}_${propertyType || 'new'}_${detectVisualPages(pageMeta).length ? 'v' : 't'}`;
   const cachedResult = cacheGet(finalCacheKey);
   if (cachedResult) {
     fullLog.push('[Cache] hit — returning cached analysis');
     fullLog.forEach(l => console.log(l));
     return callback(null, cachedResult);
   }
+
+  // Vision path runs in parallel with the text pipeline (best-effort, post-cache).
+  let _visionDone = false, _visionDefects = [];
+  const _visionLog = [];
+  visionPath(pdfBase64, pageMeta, propertyType, _visionLog, (_e, defs) => {
+    _visionDefects = defs || []; _visionDone = true;
+  });
 
   // Step 0 — cost pre-extraction (JS)
   const costMap = step0_extractCosts(pdfText);
@@ -1382,34 +1392,50 @@ function pipeline(pdfText, propertyType, callback) {
           const finalDefects = step4_schema(refinedDefects);
           fullLog.push(`[Step 4] -> ${finalDefects.length} ליקויים, ${Date.now()-t4}ms`);
 
-          // Deduplicate: same room + page + hash of first 40 chars of title (normalized)
-          const _seen = new Set();
-          const dedupedDefects = finalDefects.filter(d => {
-            const normalizedTitle = (d.title || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 40);
-            const titleKey = crypto.createHash('md5').update(normalizedTitle).digest('hex').slice(0, 8);
-            const key = `${d.area}|${d.pageNum}|${titleKey}`;
-            if (_seen.has(key)) return false;
-            _seen.add(key);
-            return true;
-          });
-          if (dedupedDefects.length < finalDefects.length) {
-            fullLog.push(`[Step 4] -> dedup removed ${finalDefects.length - dedupedDefects.length} duplicates`);
+          // Wait for the parallel vision path, then merge before dedup.
+          const _afterVision = () => {
+            _visionLog.forEach(l => fullLog.push(l));
+            const merged = mergeDefects(finalDefects, _visionDefects);
+            // Deduplicate: same room + page + hash of first 40 chars of title (normalized)
+            const _seen = new Set();
+            const dedupedDefects = merged.filter(d => {
+              const normalizedTitle = (d.title || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 40);
+              const titleKey = crypto.createHash('md5').update(normalizedTitle).digest('hex').slice(0, 8);
+              const key = `${d.area}|${d.pageNum}|${titleKey}`;
+              if (_seen.has(key)) return false;
+              _seen.add(key);
+              return true;
+            });
+            if (dedupedDefects.length < merged.length) {
+              fullLog.push(`[Step 4] -> dedup removed ${merged.length - dedupedDefects.length} duplicates`);
+            }
+            _finishPipeline(dedupedDefects);
+          };
+
+          function _finishPipeline(dedupedDefects) {
+            // Cost coverage validation — LLM total takes precedence; regex is fallback
+            const llmTotal = (sectionMap && sectionMap.reportTotal > 0) ? sectionMap.reportTotal : 0;
+            const finalReportTotal = (llmTotal && llmTotal > 0) ? llmTotal : reportTotal;
+            fullLog.push(`[reportTotal] llm=₪${llmTotal.toLocaleString()} regex=₪${reportTotal.toLocaleString()} → final=₪${finalReportTotal.toLocaleString()} (source: ${llmTotal?'LLM':'regex'})`);
+            const sumExtracted = dedupedDefects.reduce((a,d) => a + (d.cMin||0), 0);
+            const coverage = finalReportTotal > 0 ? Math.round(sumExtracted/finalReportTotal*100) : 0;
+            fullLog.push(`[Cost Coverage] ${coverage}% — extracted ₪${sumExtracted.toLocaleString()} vs report ₪${finalReportTotal.toLocaleString()}`);
+            const photosLinked = dedupedDefects.filter(d => d.bbox).length;
+            fullLog.push(`[Vision] photosLinked=${photosLinked}`);
+            fullLog.push(`[Total] ${Date.now()-t0}ms`);
+            fullLog.push('===================');
+            fullLog.forEach(l => console.log(l));
+            const resultJson = JSON.stringify({ defects: dedupedDefects, reportTotal: finalReportTotal, structureType, analysisLog: fullLog, visionMeta: { pagesScanned: detectVisualPages(pageMeta).length, photosLinked } });
+            cacheSet(finalCacheKey, resultJson);
+            callback(null, resultJson);
           }
 
-          // Cost coverage validation — LLM total takes precedence; regex is fallback
-          const llmTotal = (sectionMap && sectionMap.reportTotal > 0) ? sectionMap.reportTotal : 0;
-          const finalReportTotal = (llmTotal && llmTotal > 0) ? llmTotal : reportTotal;
-          fullLog.push(`[reportTotal] llm=₪${llmTotal.toLocaleString()} regex=₪${reportTotal.toLocaleString()} → final=₪${finalReportTotal.toLocaleString()} (source: ${llmTotal?'LLM':'regex'})`);
-          const sumExtracted = dedupedDefects.reduce((a,d) => a + (d.cMin||0), 0);
-          const coverage = finalReportTotal > 0 ? Math.round(sumExtracted/finalReportTotal*100) : 0;
-          fullLog.push(`[Cost Coverage] ${coverage}% — extracted ₪${sumExtracted.toLocaleString()} vs report ₪${finalReportTotal.toLocaleString()}`);
-          fullLog.push(`[Total] ${Date.now()-t0}ms`);
-          fullLog.push('===================');
-          fullLog.forEach(l => console.log(l));
-
-          const resultJson = JSON.stringify({ defects: dedupedDefects, reportTotal: finalReportTotal, structureType, analysisLog: fullLog });
-          cacheSet(finalCacheKey, resultJson);
-          callback(null, resultJson);
+          // Join: merge+finish once vision is done (or after a 90s safety cap).
+          if (_visionDone) _afterVision();
+          else {
+            const _iv = setInterval(() => { if (_visionDone) { clearInterval(_iv); _afterVision(); } }, 200);
+            setTimeout(() => { if (!_visionDone) { _visionDone = true; clearInterval(_iv); fullLog.push('[Vision] ✗ timeout — text only'); _afterVision(); } }, 90000);
+          }
         }); // end step3d
       });
     });
@@ -1441,7 +1467,7 @@ http.createServer((req, res) => {
     });
     req.on('end', () => {
       try {
-        const { pdfText, propertyType } = JSON.parse(Buffer.concat(body).toString('utf8'));
+        const { pdfText, propertyType, pdfBase64, pageMeta } = JSON.parse(Buffer.concat(body).toString('utf8'));
         if (!pdfText) { res.writeHead(400,{'Content-Type':'application/json'}); return res.end(JSON.stringify({error:'Missing PDF text'})); }
         if (pdfText.length > 2000000) {
           res.writeHead(413, {'Content-Type': 'application/json'});
@@ -1450,7 +1476,7 @@ http.createServer((req, res) => {
         const hasAnyKey = GROQ_KEYS.length || CEREBRAS_KEY || GEMINI_KEY || OPENROUTER_KEY;
         if (!hasAnyKey) { res.writeHead(500,{'Content-Type':'application/json'}); return res.end(JSON.stringify({error:'חסרים API keys ב-.env.local'})); }
 
-        pipeline(pdfText, propertyType, (err, raw) => {
+        pipeline(pdfText, propertyType, { pdfBase64, pageMeta }, (err, raw) => {
           if (err) { console.error('שגיאה:', err.message); res.writeHead(502,{'Content-Type':'application/json'}); return res.end(JSON.stringify({error:err.message})); }
           res.writeHead(200,{'Content-Type':'application/json'});
           res.end(raw);
