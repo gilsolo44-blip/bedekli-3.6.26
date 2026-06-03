@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>בדקלי — הדוח שלך, בשפה שלך</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23C96442' rx='18' width='100' height='100'/><path d='M50 20L20 45v35h22V60h16v20h22V45z' fill='white'/></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+/* ═══════════════ TOKENS — Warm Linen & Coral ═══════════════ */
+:root{
+  --s50:#FDFAF6; --s100:#F6F0E8; --s200:#EAE0D0; --s300:#D8CABB;
+  --s400:#A89880; --s500:#7C6B58; --s600:#5A4A3A; --s700:#3C3028;
+  --s800:#261C14; --s900:#16100A; --s950:#0C0906;
+  --ac:#C96442; --ac-lt:#E07A56; --ac-dk:#A64E30; --ac-bg:#FFF1EB;
+  --ru:#9A3412; --oc:#92400E; --sg:#15603A;
+  --glide:cubic-bezier(0.16,1,0.3,1);
+  --heavy:cubic-bezier(0.3,0,0,1);
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px; --r-2xl:30px; --r-full:9999px;
+}
+
+html,body{
+  font-family:'Geist','Heebo',sans-serif;
+  background:var(--s50);
+  min-height:100dvh;-webkit-font-smoothing:antialiased;
+}
+.scr{display:none;}
+.scr.on{display:flex;flex-direction:column;min-height:100dvh;}
+
+/* ═══════════════ KEYFRAMES ═══════════════ */
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:none;}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+@keyframes warmDrift{
+  0%,100%{transform:translate(0,0) scale(1);}
+  40%{transform:translate(22px,-14px) scale(1.03);}
+  70%{transform:translate(-12px,10px) scale(0.98);}
+}
+@keyframes scanLine{
+  0%{transform:translateY(-100%);opacity:.6;}
+  100%{transform:translateY(500%);opacity:0;}
+}
+@keyframes borderGlide{
+  0%{background-position:0% 50%;}100%{background-position:200% 50%;}
+}
+@keyframes breathe{0%,100%{opacity:.3;transform:scale(1);}50%{opacity:.9;transform:scale(1.5);}}
+
+/* ═══════════════════════════════════════════════════
+   AUTH — Warm Linen with Coral & Sage Ambient
+═══════════════════════════════════════════════════ */
+#auth{
+  background:var(--s50);
+  position:relative;overflow:hidden;
+  align-items:center;justify-content:center;
+}
+/* Subtle grain on light */
+#auth::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity:.5;
+}
+/* Hairline grid — warm dark on light */
+.auth-grid{
+  position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(80,50,30,.028) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(80,50,30,.028) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,black 10%,transparent 100%);
+}
+/* Pastel ambient blobs — coral, sage, amber on cream */
+.blob{position:absolute;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0;}
+.blob-1{
+  width:680px;height:680px;top:-22%;right:-10%;opacity:.55;
+  background:radial-gradient(circle,rgba(215,110,70,.22) 0%,transparent 65%);
+  animation:warmDrift 32s ease-in-out infinite;
+}
+.blob-2{
+  width:500px;height:500px;bottom:-14%;left:-6%;opacity:.45;
+  background:radial-gradient(circle,rgba(72,160,100,.18) 0%,transparent 65%);
+  animation:warmDrift 38s ease-in-out infinite reverse;
+}
+.blob-3{
+  width:300px;height:300px;top:35%;left:25%;opacity:.35;
+  background:radial-gradient(circle,rgba(225,175,65,.2) 0%,transparent 65%);
+  animation:warmDrift 26s ease-in-out infinite;
+}
+/* ── Layout — Asymmetric split ── */
+.auth-inner{
+  position:relative;z-index:1;
+  display:grid;grid-template-columns:1.2fr .8fr;
+  max-width:980px;width:100%;
+  min-height:100dvh;padding:0 32px;margin:0 auto;
+  align-items:center;gap:64px;
+}
+/* ── Left: brand editorial ── */
+.auth-brand{
+  padding:80px 0;
+  animation:fadeUp .7s var(--glide) .05s both;
+}
+.brand-logo-row{
+  display:flex;align-items:center;gap:10px;margin-bottom:52px;
+}
+.brand-ico{
+  width:36px;height:36px;
+  background:var(--ac-bg);
+  border:0.5px solid rgba(200,100,65,.25);
+  border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+}
+.brand-ico svg{width:15px;height:15px;color:var(--ac);}
+.brand-name{
+  font-size:15px;font-weight:800;
+  color:var(--s500);
+  letter-spacing:.07em;text-transform:uppercase;
+  font-family:'Geist Mono',monospace;
+}
+.brand-h{
+  font-size:clamp(36px,4.4vw,58px);font-weight:800;
+  line-height:1.04;letter-spacing:-.8px;
+  color:var(--s900);margin-bottom:18px;
+}
+.brand-h .hi{
+  color:var(--s400);
+  font-weight:400;
+}
+.brand-p{
+  font-size:14px;line-height:1.95;
+  color:var(--s500);
+  max-width:320px;margin-bottom:48px;font-weight:400;
+}
+.brand-feats{display:flex;flex-direction:column;gap:12px;}
+.bfeat{
+  display:flex;align-items:center;gap:10px;
+  font-size:12.5px;color:var(--s600);font-weight:400;
+}
+.bfeat-ico{
+  width:18px;height:18px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;color:var(--ac);
+}
+.bfeat-ico svg{width:13px;height:13px;}
+/* ── Right: auth card ── */
+.auth-card-wrap{
+  display:flex;align-items:center;justify-content:center;
+  padding:60px 0;
+  animation:fadeUp .7s var(--glide) .14s both;
+}
+.auth-card{
+  background:white;
+  border-radius:var(--r-2xl);padding:38px 34px 34px;
+  width:100%;max-width:368px;
+  border:0.5px solid var(--s200);
+  box-shadow:0 12px 56px -8px rgba(80,40,20,.1),0 0 0 0.5px rgba(180,120,80,.06);
+}
+.card-mark{
+  display:flex;align-items:center;gap:7px;
+  margin-bottom:4px;
+}
+.card-mark-ico{
+  width:24px;height:24px;background:var(--ac);
+  border-radius:7px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.card-mark-ico svg{width:11px;height:11px;color:rgba(255,255,255,.9);}
+.card-mark-name{
+  font-size:13px;font-weight:800;color:var(--s900);
+  letter-spacing:-.1px;
+}
+.card-tag{
+  font-size:10px;color:var(--s400);margin-bottom:26px;
+  letter-spacing:.04em;
+  font-family:'Geist Mono',monospace;
+}
+/* Tab switcher */
+.ctabs{
+  display:grid;grid-template-columns:1fr 1fr;
+  background:var(--s100);border-radius:var(--r-sm);
+  padding:2.5px;gap:2px;margin-bottom:20px;
+  border:0.5px solid var(--s200);
+}
+.ctab{
+  padding:8px;text-align:center;font-size:12.5px;font-weight:700;
+  cursor:pointer;background:transparent;color:var(--s500);
+  border:none;font-family:'Geist','Heebo',sans-serif;
+  border-radius:6px;transition:all .2s var(--glide);
+}
+.ctab.on{
+  background:white;color:var(--s900);
+  box-shadow:0 1px 4px rgba(0,0,0,.07),0 0 0 0.5px rgba(0,0,0,.04);
+}
+/* Form fields */
+.field{margin-bottom:11px;}
+.field label{
+  display:block;font-size:9.5px;font-weight:800;
+  color:var(--s500);margin-bottom:5px;
+  letter-spacing:.1em;text-transform:uppercase;
+  font-family:'Geist Mono',monospace;
+}
+.finput{
+  width:100%;padding:10.5px 12px;
+  border:0.5px solid var(--s300);border-radius:var(--r-md);
+  font-family:'Geist','Heebo',sans-serif;font-size:13.5px;
+  background:white;color:var(--s900);outline:none;
+  transition:all .22s var(--glide);direction:ltr;text-align:left;
+}
+.finput:focus{
+  border-color:var(--s700);background:white;
+  box-shadow:0 0 0 2.5px rgba(44,40,36,.07);
+}
+.finput::placeholder{color:var(--s400);}
+.auth-err{font-size:11px;color:#B91C1C;min-height:15px;margin-top:3px;text-align:center;}
+.auth-submit{
+  width:100%;padding:11.5px;
+  background:var(--ac);color:white;
+  font-family:'Geist','Heebo',sans-serif;font-size:13.5px;font-weight:700;
+  border:none;border-radius:var(--r-full);cursor:pointer;
+  transition:all .3s var(--glide);margin-top:4px;
+  box-shadow:0 4px 20px rgba(200,100,65,.35);letter-spacing:-.05px;
+}
+.auth-submit:hover{background:var(--ac-dk);transform:translateY(-1.5px);box-shadow:0 8px 28px rgba(200,100,65,.45);}
+.auth-submit:active{transform:translateY(-0.5px);}
+.auth-note{
+  font-size:10.5px;color:var(--s400);text-align:center;
+  margin-top:12px;line-height:1.75;
+}
+.divider{
+  display:flex;align-items:center;gap:10px;
+  margin:13px 0 10px;color:var(--s300);font-size:10.5px;
+}
+.divider::before,.divider::after{content:'';flex:1;height:0.5px;background:var(--s200);}
+.demo-btn{
+  width:100%;padding:9.5px;
+  background:white;color:var(--s700);
+  font-family:'Geist','Heebo',sans-serif;font-size:12.5px;font-weight:600;
+  border:0.5px solid var(--s200);border-radius:var(--r-full);cursor:pointer;
+  transition:all .2s var(--glide);
+}
+.demo-btn:hover{border-color:var(--s500);color:var(--s900);}
+
+/* ═══════════════════════════════════════════════════
+   APP SCREEN — Stone Linen
+═══════════════════════════════════════════════════ */
+#app{background:var(--s50);}
+#app::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 50% 32% at 0% 0%,rgba(154,52,18,.03) 0%,transparent 60%),
+    radial-gradient(ellipse 38% 25% at 100% 100%,rgba(146,64,14,.025) 0%,transparent 55%);
+}
+/* Topbar */
+.topbar{
+  background:rgba(250,250,249,.95);
+  backdrop-filter:blur(20px) saturate(160%);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  border-bottom:0.5px solid var(--s200);
+  padding:0 24px;height:52px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.tbar-logo{
+  font-family:'Geist',sans-serif;font-weight:800;font-size:16px;
+  color:var(--s900);display:flex;align-items:center;gap:8px;
+  cursor:pointer;letter-spacing:-.2px;
+}
+.tbar-ico{
+  width:26px;height:26px;background:var(--ac);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+}
+.tbar-ico svg{width:11px;height:11px;color:rgba(255,255,255,.8);}
+.tbar-right{display:flex;align-items:center;gap:6px;}
+.tbar-badge{
+  font-family:'Geist Mono',monospace;
+  font-size:10px;font-weight:600;
+  padding:3px 10px;border-radius:var(--r-full);
+  background:var(--s100);color:var(--s600);
+  border:0.5px solid var(--s200);letter-spacing:.04em;
+}
+.tbar-btn{
+  display:flex;align-items:center;gap:4px;
+  padding:5px 11px;border-radius:var(--r-full);
+  font-size:11px;font-weight:600;font-family:'Geist',sans-serif;
+  cursor:pointer;background:white;color:var(--s600);
+  border:0.5px solid var(--s200);
+  transition:all .2s var(--glide);
+}
+.tbar-btn:hover{color:var(--s900);border-color:var(--s500);}
+.tbar-btn svg{width:11px;height:11px;}
+/* Main */
+.app-main{
+  position:relative;z-index:1;
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  padding:40px 16px 100px;
+}
+.app-col{width:100%;max-width:520px;display:flex;flex-direction:column;}
+/* Section label */
+.sec-lbl{
+  font-size:9px;font-weight:800;color:var(--s400);
+  letter-spacing:.14em;text-transform:uppercase;
+  margin-bottom:9px;font-family:'Geist Mono',monospace;
+}
+/* Greeting */
+.greeting{
+  margin-bottom:28px;
+  animation:fadeUp .5s var(--glide) .05s both;
+}
+.greeting-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;}
+.greeting-h{
+  font-size:20px;font-weight:800;
+  color:var(--s900);letter-spacing:-.3px;
+}
+.greeting-sub{font-size:12.5px;color:var(--s500);line-height:1.7;}
+.status-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  background:white;border:0.5px solid var(--s200);
+  border-radius:var(--r-full);padding:4px 11px 4px 8px;
+  font-size:10.5px;font-weight:600;color:var(--s600);
+  font-family:'Geist Mono',monospace;letter-spacing:.03em;
+}
+.status-dot{
+  width:5.5px;height:5.5px;background:var(--sg);
+  border-radius:50%;animation:breathe 2.8s ease-in-out infinite;
+}
+/* Steps */
+.steps{
+  display:flex;background:white;border:0.5px solid var(--s200);
+  border-radius:var(--r-lg);overflow:hidden;margin-bottom:22px;
+  animation:fadeUp .5s var(--glide) .1s both;
+}
+.step-item{
+  flex:1;padding:11px 8px;text-align:center;position:relative;
+}
+.step-item:not(:last-child)::after{
+  content:'';position:absolute;top:50%;right:0;
+  width:0.5px;height:24px;background:var(--s200);transform:translateY(-50%);
+}
+.step-n{
+  width:19px;height:19px;border-radius:50%;
+  background:var(--s100);font-size:8.5px;font-weight:800;color:var(--s500);
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 4px;border:0.5px solid var(--s200);
+  font-family:'Geist Mono',monospace;transition:all .3s var(--glide);
+}
+.step-item.act .step-n{background:var(--ac);border-color:var(--ac);color:white;}
+.step-item.done .step-n{background:var(--sg-50,#F0FDF4);border-color:#86EFAC;color:var(--sg);}
+.step-lbl{font-size:10px;font-weight:700;color:var(--s400);letter-spacing:.03em;}
+.step-item.act .step-lbl{color:var(--s800);}
+.step-item.done .step-lbl{color:var(--sg);}
+
+/* ── Property type ── */
+.type-wrap{
+  margin-bottom:18px;
+  animation:fadeUp .5s var(--glide) .18s both;
+}
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.type-card{
+  background:white;border:0.5px solid var(--s200);
+  border-radius:var(--r-xl);padding:18px 15px 16px;
+  cursor:pointer;transition:all .3s var(--glide);
+  position:relative;overflow:hidden;
+}
+.type-card::before{
+  content:'';position:absolute;top:0;right:0;left:0;height:2px;
+  background:var(--ac);transform:scaleX(0);transform-origin:right;
+  transition:transform .35s var(--glide);
+}
+.type-card:hover{border-color:var(--s400);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.06);}
+.type-card.sel{border-color:var(--ac);border-width:0.5px;}
+.type-card.sel::before{transform:scaleX(1);}
+.type-card.sel .tck{opacity:1;transform:scale(1);}
+.type-card.sel .tcard-ico{background:var(--ac);border-color:var(--ac);}
+.type-card.sel .tcard-ico svg{color:rgba(255,255,255,.9);}
+.tck{
+  position:absolute;top:10px;left:10px;
+  width:17px;height:17px;
+  background:var(--ac);color:white;
+  border-radius:50%;font-size:8.5px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:scale(.1);
+  transition:all .3s var(--glide);
+}
+.tcard-ico{
+  width:38px;height:38px;border-radius:10px;
+  background:var(--s100);border:0.5px solid var(--s200);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:10px;transition:all .25s;
+}
+.tcard-ico svg{width:17px;height:17px;color:var(--s600);}
+.tcard-name{font-size:12.5px;font-weight:800;color:var(--s900);margin-bottom:2px;letter-spacing:-.1px;}
+.tcard-desc{font-size:10.5px;color:var(--s500);line-height:1.5;}
+.tcard-badge{
+  display:inline-block;margin-top:7px;
+  font-size:9px;font-weight:700;padding:2px 6px;
+  border-radius:4px;letter-spacing:.05em;text-transform:uppercase;
+  background:var(--s100);color:var(--s600);border:0.5px solid var(--s200);
+  font-family:'Geist Mono',monospace;
+}
+
+/* ── Upload zone ── */
+.upload-wrap{
+  margin-bottom:24px;
+  animation:fadeUp .5s var(--glide) .25s both;
+}
+.upcard{
+  background:white;border:0.5px dashed var(--s300);
+  border-radius:var(--r-2xl);padding:44px 28px;
+  cursor:pointer;text-align:center;
+  transition:all .35s var(--glide);
+  position:relative;overflow:hidden;
+}
+/* Animated hairline border on hover */
+.upcard::before{
+  content:'';position:absolute;inset:-1px;border-radius:var(--r-2xl);
+  background:linear-gradient(90deg,var(--ac),var(--ac-lt),#E8A870,var(--ac-dk),var(--ac));
+  background-size:300% 100%;opacity:0;
+  animation:borderGlide 3.5s linear infinite;
+  pointer-events:none;transition:opacity .35s var(--glide);
+}
+.upcard::after{
+  content:'';position:absolute;inset:1px;
+  border-radius:calc(var(--r-2xl) - 1px);
+  background:white;pointer-events:none;
+}
+.upcard>*{position:relative;z-index:1;}
+.upcard:hover,.upcard.drag{
+  border-color:transparent;
+  transform:translateY(-3px);
+  box-shadow:0 14px 44px rgba(0,0,0,.08);
+}
+.upcard:hover::before,.upcard.drag::before{opacity:1;}
+.upcard:hover .up-ico-box,.upcard.drag .up-ico-box{
+  background:var(--ac);border-color:var(--ac);
+}
+.upcard:hover .up-ico-box svg,.upcard.drag .up-ico-box svg{color:rgba(255,255,255,.8);}
+.up-ico-box{
+  width:58px;height:58px;margin:0 auto 16px;
+  background:var(--s100);border-radius:15px;border:0.5px solid var(--s200);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .3s var(--glide);position:relative;overflow:hidden;
+}
+.up-ico-box svg{width:23px;height:23px;color:var(--s500);transition:color .3s;}
+/* Scan line */
+.up-ico-box::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(transparent 0%,rgba(255,255,255,.45) 50%,transparent 100%);
+  opacity:0;animation:scanLine 2.4s ease-in-out infinite;
+  pointer-events:none;transition:opacity .3s;
+}
+.upcard:hover .up-ico-box::after{opacity:1;}
+.up-title{font-size:15.5px;font-weight:700;color:var(--s900);margin-bottom:5px;letter-spacing:-.15px;}
+.up-sub{font-size:12px;color:var(--s400);margin-bottom:20px;line-height:1.7;}
+.up-cta{
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--ac);color:white;
+  font-family:'Geist',sans-serif;font-size:13px;font-weight:700;
+  padding:9.5px 22px;border-radius:var(--r-full);border:none;cursor:pointer;
+  transition:all .3s var(--glide);
+  box-shadow:0 4px 18px rgba(200,100,65,.35);letter-spacing:-.05px;
+}
+.up-cta:hover{background:var(--ac-dk);transform:translateY(-1.5px);box-shadow:0 8px 28px rgba(200,100,65,.45);}
+.up-cta:active{transform:translateY(-0.5px);}
+.up-cta svg{width:12px;height:12px;}
+.up-chips{display:flex;justify-content:center;gap:5px;margin-top:14px;}
+.up-chip{
+  font-size:10px;color:var(--s400);
+  background:var(--s100);border:0.5px solid var(--s200);
+  padding:2px 8px;border-radius:4px;font-weight:500;
+  font-family:'Geist Mono',monospace;letter-spacing:.03em;
+}
+input[type=file]{display:none;}
+
+/* ── Progress card ── */
+.prog-card{
+  background:white;border-radius:var(--r-xl);padding:26px 22px;
+  width:100%;margin-bottom:24px;
+  border:0.5px solid var(--s200);
+  box-shadow:0 4px 20px rgba(0,0,0,.05);
+  display:none;text-align:center;
+}
+.prog-card.on{display:block;animation:fadeUp .3s var(--glide) both;}
+.prog-fname{
+  font-size:12.5px;font-weight:700;
+  color:var(--s900);margin-bottom:16px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-family:'Geist Mono',monospace;
+}
+/* ── House building loader ── */
+.house-loader{display:flex;flex-direction:column;align-items:center;padding:14px 0 4px;margin-bottom:8px;}
+.house-svg{overflow:visible;filter:drop-shadow(0 3px 10px rgba(0,0,0,.06));}
+.hl-s{fill:none;stroke:var(--s500);stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8;}
+.hl-thin{fill:none;stroke:var(--s300);stroke-linecap:round;stroke-linejoin:round;stroke-width:1;}
+.hl-f{stroke:none;opacity:0;}
+.hl-fw{fill:var(--s50,#fafaf9);}
+.hl-fr{fill:var(--s100,#f5f5f4);}
+.hl-fd{fill:var(--s200,#e7e5e4);}
+.hl-fwn{fill:rgba(186,230,253,.4);}
+@keyframes hlDraw{from{stroke-dashoffset:700}to{stroke-dashoffset:0}}
+@keyframes hlFade{from{opacity:0}to{opacity:1}}
+@keyframes hlSmoke{
+  0%  {transform:translate(0,0) scale(.7);opacity:.55;}
+  100%{transform:translate(-6px,-26px) scale(2.2);opacity:0;}
+}
+.hl-ground{stroke-dasharray:700;stroke-dashoffset:700;animation:hlDraw .3s ease forwards 0s;}
+.hl-found {stroke-dasharray:700;stroke-dashoffset:700;animation:hlDraw .35s ease forwards .28s;}
+.hl-walls {stroke-dasharray:700;stroke-dashoffset:700;animation:hlDraw .65s ease forwards .6s;}
+.hl-roof  {stroke-dasharray:700;stroke-dashoffset:700;animation:hlDraw .5s ease forwards 1.22s;}
+.hl-chim  {stroke-dasharray:700;stroke-dashoffset:700;animation:hlDraw .28s ease forwards 1.72s;}
+.hl-door  {stroke-dasharray:700;stroke-dashoffset:700;animation:hlDraw .38s ease forwards 2.02s;}
+.hl-win   {stroke-dasharray:700;stroke-dashoffset:700;animation:hlDraw .32s ease forwards 2.42s;}
+.hl-cross {stroke-dasharray:700;stroke-dashoffset:700;animation:hlDraw .22s ease forwards 2.74s;}
+.hl-fw {animation:hlFade .4s ease forwards 1.32s;}
+.hl-fr {animation:hlFade .4s ease forwards 1.85s;}
+.hl-fd {animation:hlFade .35s ease forwards 2.25s;}
+.hl-fwn{animation:hlFade .3s ease forwards 2.58s;}
+.hl-smoke{stroke:none;opacity:0;transform-box:fill-box;transform-origin:center;}
+.sm1{fill:var(--s200);animation:hlSmoke 2.1s ease-in infinite 3.1s;}
+.sm2{fill:var(--s150,#e7e5e4);animation:hlSmoke 2.1s ease-in infinite 3.75s;}
+.sm3{fill:var(--s100);animation:hlSmoke 2.1s ease-in infinite 4.4s;}
+/* Progress dots */
+.prog-dots{display:flex;justify-content:center;gap:5px;margin-bottom:11px;}
+.pdot{width:5px;height:5px;border-radius:3px;background:var(--s200);transition:all .3s var(--glide);}
+.pdot.act{background:var(--ac);width:17px;}
+.pdot.dn{background:var(--s400);}
+.prog-lbl{
+  font-size:10.5px;color:var(--s400);margin-top:10px;min-height:16px;
+  font-family:'Geist Mono',monospace;letter-spacing:.03em;
+}
+/* Walking people */
+.p-s{fill:none;stroke:var(--s500);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.p-fs{fill:var(--s500);stroke:none;}
+@keyframes hlPWalk{from{transform:translate(-78px,108px)}to{transform:translate(238px,108px)}}
+@keyframes hlPBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
+@keyframes hlLL{0%,100%{transform:rotate(-25deg)}50%{transform:rotate(25deg)}}
+@keyframes hlRL{0%,100%{transform:rotate(25deg)}50%{transform:rotate(-25deg)}}
+@keyframes hlLA{0%,100%{transform:rotate(22deg)}50%{transform:rotate(-22deg)}}
+@keyframes hlRA{0%,100%{transform:rotate(-22deg)}50%{transform:rotate(22deg)}}
+.pw1{animation:hlPWalk 5.5s linear infinite 3.1s;animation-fill-mode:backwards;}
+.pw2{animation:hlPWalk 5.5s linear infinite 3.85s;animation-fill-mode:backwards;}
+.p-bob{animation:hlPBob .44s ease-in-out infinite;}
+.p-ll{animation:hlLL .44s ease-in-out infinite;}
+.p-lr{animation:hlRL .44s ease-in-out infinite;}
+.p-al{animation:hlLA .44s ease-in-out infinite;}
+.p-ar{animation:hlRA .44s ease-in-out infinite;}
+/* Caption inside loader */
+.house-caption{
+  font-size:11.5px;font-weight:600;color:var(--s600);margin-top:14px;
+  min-height:17px;font-family:'Geist','Heebo',sans-serif;
+  letter-spacing:.01em;text-align:center;
+}
+
+/* ── Reports list ── */
+.reports-sec{animation:fadeUp .5s var(--glide) .32s both;}
+.rep-list{display:flex;flex-direction:column;gap:5px;}
+.rep-item{
+  background:white;border:0.5px solid var(--s200);border-radius:var(--r-lg);
+  padding:12px 15px;display:flex;align-items:center;gap:12px;
+  cursor:pointer;transition:all .25s var(--glide);text-decoration:none;
+}
+.rep-item:hover{border-color:var(--s400);box-shadow:0 4px 14px rgba(0,0,0,.05);transform:translateY(-1.5px);}
+.rep-ico{
+  width:32px;height:32px;background:var(--s100);border-radius:var(--r-sm);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  border:0.5px solid var(--s200);color:var(--s500);
+}
+.rep-ico svg{width:13px;height:13px;}
+.rep-info{flex:1;min-width:0;}
+.rep-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--s900);}
+.rep-meta{font-size:10.5px;color:var(--s400);margin-top:2px;font-family:'Geist Mono',monospace;}
+.rep-arr{color:var(--s300);flex-shrink:0;transition:color .2s;}
+.rep-item:hover .rep-arr{color:var(--s600);}
+.rep-arr svg{width:12px;height:12px;}
+.no-reports{
+  font-size:12.5px;color:var(--s400);text-align:center;
+  padding:32px;background:white;border-radius:var(--r-lg);
+  border:0.5px dashed var(--s200);line-height:1.85;
+}
+.no-reports strong{display:block;font-size:13.5px;color:var(--s700);margin-bottom:5px;font-weight:700;}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(32px);
+  background:var(--s900);color:rgba(255,255,255,.85);
+  padding:8px 18px;border-radius:var(--r-full);
+  font-size:11.5px;font-weight:600;
+  transition:all .25s var(--glide);z-index:500;
+  pointer-events:none;opacity:0;
+  box-shadow:0 8px 24px rgba(30,15,8,.25);
+  border:0.5px solid rgba(255,255,255,.06);
+}
+.toast.sh{transform:translateX(-50%) translateY(0);opacity:1;}
+
+/* ═══════════════ RESPONSIVE ═══════════════ */
+@media(max-width:660px){
+  .auth-inner{grid-template-columns:1fr;padding:0 20px;}
+  .auth-brand{display:none;}
+  .auth-card-wrap{padding:60px 0 44px;align-items:flex-start;}
+  .auth-card{padding:30px 20px 26px;}
+  .topbar{padding:0 14px;}
+  .app-main{padding:24px 14px 80px;}
+  .steps{display:none;}
+  .upcard{padding:36px 18px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════ AUTH ══════════════════════════════ -->
+<div id="auth" class="scr on">
+  <div class="auth-grid"></div>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <div class="auth-inner">
+    <!-- Left: editorial brand -->
+    <div class="auth-brand">
+      <div class="brand-logo-row">
+        <div class="brand-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        </div>
+        <span class="brand-name">Bedekli</span>
+      </div>
+      <h1 class="brand-h">הדוח שלך,<br><span class="hi">בשפה שלך.</span></h1>
+      <p class="brand-p">קיבלת דוח בדק בית? תן ל-AI לנתח אותו — כל הממצאים בעברית פשוטה, מסודרים לפי חדרים וחומרה.</p>
+      <div class="brand-feats">
+        <div class="bfeat">
+          <div class="bfeat-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          ניתוח מלא תוך דקות — ללא עלות
+        </div>
+        <div class="bfeat">
+          <div class="bfeat-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          ממצאים ממוינים לפי חדר, קטגוריה וחומרה
+        </div>
+        <div class="bfeat">
+          <div class="bfeat-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          ייצוא לאקסל לשיתוף עם הקבלן
+        </div>
+        <div class="bfeat">
+          <div class="bfeat-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          ציטוטים מדויקים מהדוח לכל ממצא
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: auth card -->
+    <div class="auth-card-wrap">
+      <div class="auth-card">
+        <div class="card-mark">
+          <div class="card-mark-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+          </div>
+          <span class="card-mark-name">בדקלי</span>
+        </div>
+        <div class="card-tag">PROPERTY INSPECTION · AI ANALYSIS</div>
+        <div style="text-align:center;padding:18px 0 8px;">
+          <div style="font-size:14px;font-weight:600;color:var(--s700);margin-bottom:6px;line-height:1.7;">העלה את דוח הבדק שלך<br>וקבל ניתוח AI מלא תוך דקות</div>
+          <div style="font-size:11.5px;color:var(--s400);margin-bottom:18px;">ללא הרשמה · ללא שמירת מידע אישי</div>
+        </div>
+        <button class="auth-submit" onclick="enterApp()">התחל ניתוח</button>
+        <p class="auth-note">שירות חינמי · ללא שמירת נתונים</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ APP ══════════════════════════════ -->
+<div id="app" class="scr">
+  <nav class="topbar">
+    <div class="tbar-logo" onclick="goHome()">
+      <div class="tbar-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      </div>
+      בדקלי
+    </div>
+    <div class="tbar-right">
+      <span class="tbar-badge">שירות חינמי</span>
+    </div>
+  </nav>
+
+  <div class="app-main">
+    <div class="app-col">
+
+      <!-- Greeting -->
+      <div class="greeting">
+        <div class="greeting-row">
+          <div class="greeting-h">ניתוח דוח בדק</div>
+          <div class="status-pill">
+            <div class="status-dot"></div>
+            <span id="usageTxt">פעיל</span>
+          </div>
+        </div>
+        <div class="greeting-sub">בחר סוג נכס, העלה את קובץ ה-PDF וקבל ניתוח מלא</div>
+      </div>
+
+      <!-- Steps -->
+      <div class="steps">
+        <div class="step-item act" id="s1"><div class="step-n">1</div><div class="step-lbl">סוג נכס</div></div>
+        <div class="step-item" id="s2"><div class="step-n">2</div><div class="step-lbl">העלאה</div></div>
+        <div class="step-item" id="s3"><div class="step-n">3</div><div class="step-lbl">ניתוח</div></div>
+        <div class="step-item" id="s4"><div class="step-n">4</div><div class="step-lbl">מוכן</div></div>
+      </div>
+
+      <!-- Type selector -->
+      <div class="type-wrap">
+        <div class="sec-lbl">סוג הנכס</div>
+        <div class="type-grid">
+          <div class="type-card sel" id="tnew" onclick="selType('new')">
+            <div class="tck">&#x2713;</div>
+            <div class="tcard-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="11" x2="13" y2="11"/></svg>
+            </div>
+            <div class="tcard-name">דירה חדשה מקבלן</div>
+            <div class="tcard-desc">מסירה ראשונה · בנייה חדשה</div>
+            <span class="tcard-badge">חוק מכר · אחריות קבלן</span>
+          </div>
+          <div class="type-card" id="ty2" onclick="selType('yad2')">
+            <div class="tck">&#x2713;</div>
+            <div class="tcard-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+            </div>
+            <div class="tcard-name">דירה יד שנייה</div>
+            <div class="tcard-desc">רכישה מבעלים קודמים</div>
+            <span class="tcard-badge">מו"מ · תקציב תיקונים</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload -->
+      <div class="upload-wrap">
+        <div class="sec-lbl">קובץ PDF</div>
+        <div class="upcard" id="upcard">
+          <div class="up-ico-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </div>
+          <div class="up-title">העלה את דוח הבדק שלך</div>
+          <div class="up-sub">גרור PDF לכאן, או לחץ לבחירה</div>
+          <button class="up-cta" onclick="event.stopPropagation();document.getElementById('fi').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            בחר קובץ PDF
+          </button>
+          <div class="up-chips">
+            <span class="up-chip">PDF בלבד</span>
+            <span class="up-chip">עד 50MB</span>
+            <span class="up-chip">מוצפן</span>
+          </div>
+        </div>
+        <input type="file" id="fi" accept=".pdf,application/pdf">
+      </div>
+
+      <!-- Progress card -->
+      <div class="prog-card" id="progCard">
+        <div class="prog-fname" id="progFname"></div>
+        <div class="prog-dots">
+          <div class="pdot" id="pd1"></div>
+          <div class="pdot" id="pd2"></div>
+          <div class="pdot" id="pd3"></div>
+          <div class="pdot" id="pd4"></div>
+        </div>
+        <div class="house-loader" id="skelPreview" style="display:none">
+          <svg class="house-svg" viewBox="0 0 160 130" width="160" height="130">
+            <!-- fills (rendered behind strokes) -->
+            <rect class="hl-f hl-fw" x="28" y="52" width="104" height="56"/>
+            <polygon class="hl-f hl-fr" points="16,54 80,14 144,54"/>
+            <path class="hl-f hl-fd" d="M66,108 L66,78 Q80,70 94,78 L94,108 Z"/>
+            <rect class="hl-f hl-fwn" x="35" y="62" width="28" height="22" rx="2"/>
+            <rect class="hl-f hl-fwn" x="97" y="62" width="28" height="22" rx="2"/>
+            <!-- strokes -->
+            <line class="hl-s hl-ground" x1="6" y1="108" x2="154" y2="108"/>
+            <rect class="hl-s hl-found" x="28" y="98" width="104" height="10" rx="1"/>
+            <rect class="hl-s hl-walls" x="28" y="52" width="104" height="56"/>
+            <polyline class="hl-s hl-roof" points="16,54 80,14 144,54 16,54"/>
+            <rect class="hl-s hl-chim" x="100" y="22" width="16" height="26"/>
+            <path class="hl-s hl-door" d="M66,108 L66,78 Q80,70 94,78 L94,108"/>
+            <rect class="hl-s hl-win" x="35" y="62" width="28" height="22" rx="2"/>
+            <line class="hl-thin hl-cross" x1="49" y1="62" x2="49" y2="84"/>
+            <line class="hl-thin hl-cross" x1="35" y1="73" x2="63" y2="73"/>
+            <rect class="hl-s hl-win" x="97" y="62" width="28" height="22" rx="2"/>
+            <line class="hl-thin hl-cross" x1="111" y1="62" x2="111" y2="84"/>
+            <line class="hl-thin hl-cross" x1="97" y1="73" x2="125" y2="73"/>
+            <!-- smoke from chimney (loops after build completes) -->
+            <circle class="hl-smoke sm1" cx="108" cy="20" r="5"/>
+            <circle class="hl-smoke sm2" cx="112" cy="13" r="4"/>
+            <circle class="hl-smoke sm3" cx="105" cy="7" r="3"/>
+            <!-- Engineer: hard hat, walks first -->
+            <g class="pw1">
+              <g class="p-bob">
+                <rect x="-5.5" y="-27" width="11" height="2.5" rx=".5" class="p-fs"/>
+                <path d="M-3.5,-24.5 Q0,-30 3.5,-24.5 Z" class="p-fs"/>
+                <circle cx="0" cy="-19" r="3.5" class="p-s"/>
+                <line x1="0" y1="-15.5" x2="0" y2="-5" class="p-s"/>
+                <g class="p-al" style="transform-origin:0px -13px"><line x1="0" y1="-13" x2="-5.5" y2="-7" class="p-s"/></g>
+                <g class="p-ar" style="transform-origin:0px -13px"><line x1="0" y1="-13" x2="5.5" y2="-7" class="p-s"/></g>
+                <g class="p-ll" style="transform-origin:0px -5px"><line x1="0" y1="-5" x2="-4" y2="8" class="p-s"/></g>
+                <g class="p-lr" style="transform-origin:0px -5px"><line x1="0" y1="-5" x2="4" y2="8" class="p-s"/></g>
+              </g>
+            </g>
+            <!-- Buyer: no hat, slightly taller, walks behind -->
+            <g class="pw2">
+              <g class="p-bob">
+                <circle cx="0" cy="-21" r="3.5" class="p-s"/>
+                <line x1="0" y1="-17.5" x2="0" y2="-5" class="p-s"/>
+                <g class="p-al" style="transform-origin:0px -14px"><line x1="0" y1="-14" x2="-5.5" y2="-8" class="p-s"/></g>
+                <g class="p-ar" style="transform-origin:0px -14px"><line x1="0" y1="-14" x2="5.5" y2="-8" class="p-s"/></g>
+                <g class="p-ll" style="transform-origin:0px -5px"><line x1="0" y1="-5" x2="-4" y2="8" class="p-s"/></g>
+                <g class="p-lr" style="transform-origin:0px -5px"><line x1="0" y1="-5" x2="4" y2="8" class="p-s"/></g>
+              </g>
+            </g>
+          </svg>
+          <div class="house-caption" id="progLbl"></div>
+        </div>
+      </div>
+
+      <!-- Reports -->
+      <div class="reports-sec" id="reportsSec">
+        <div class="sec-lbl">הדוחות שלי</div>
+        <div class="rep-list" id="repList"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let propType='new',PIMGS={};
+
+(function init(){
+  enterApp();
+  const card=document.getElementById('upcard'),fi=document.getElementById('fi');
+  fi.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+  card.addEventListener('click',e=>{if(!e.target.closest('.up-cta'))fi.click();});
+  card.addEventListener('dragover',e=>{e.preventDefault();card.classList.add('drag');});
+  card.addEventListener('dragleave',e=>{if(!card.contains(e.relatedTarget))card.classList.remove('drag');});
+  card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+})();
+
+function enterApp(){
+  show('app');
+  document.getElementById('usageTxt').textContent='ללא הגבלה';
+  document.getElementById('repList').innerHTML='<div class="no-reports"><strong>עדיין אין דוחות שמורים</strong>העלה את הדוח הראשון שלך כדי להתחיל</div>';
+}
+function goHome(){show('app');}
+
+function selType(t){
+  propType=t;
+  document.getElementById('tnew').classList.toggle('sel',t==='new');
+  document.getElementById('ty2').classList.toggle('sel',t==='yad2');
+}
+
+function setStep(pct,lbl,ph){
+  document.getElementById('progLbl').textContent=lbl;
+  if(ph!==undefined){
+    [1,2,3,4].forEach((n,i)=>{
+      document.getElementById('pd'+n).className='pdot'+(i<ph?' dn':i===ph?' act':'');
+    });
+    [1,2,3,4].forEach((n,i)=>{
+      const el=document.getElementById('s'+n);
+      if(!el)return;
+      el.className='step-item'+(i<ph?' done':i===ph?' act':'');
+    });
+    const skel=document.getElementById('skelPreview');
+    if(skel)skel.style.display=ph>=2?'block':'none';
+  }
+}
+
+async function handleFile(file){
+  if(!file)return;
+  PIMGS={};
+  document.getElementById('upcard').style.display='none';
+  const pc=document.getElementById('progCard');
+  pc.classList.add('on');
+  document.getElementById('progFname').textContent=file.name;
+  setStep(5,'טוען קובץ...',0);
+  try{
+    const buf=await file.arrayBuffer();
+    setStep(12,'פותח PDF...',0);
+    const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf),disableFontFace:true,standardFontDataUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/'}).promise;
+    const tot=pdf.numPages;let done=0;const t0=Date.now();
+    for(let i=1;i<=tot;i+=5){
+      await Promise.all(Array.from({length:Math.min(5,tot-i+1)},(_,j)=>i+j).map(async pn=>{
+        const pg=await pdf.getPage(pn);
+        const vp=pg.getViewport({scale:1.0});
+        const cv=document.createElement('canvas');
+        cv.width=vp.width;cv.height=vp.height;
+        await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+        pg.cleanup();
+        PIMGS[pn]=cv.toDataURL('image/jpeg',.65);
+        done++;
+        const el=(Date.now()-t0)/1000;
+        const rem=done>3&&el>0?(tot-done)/(done/el):null;
+        setStep(12+Math.round(done/tot*36),rem?`מרנדר ${done}/${tot} · עוד ~${Math.round(rem)}ש`:`מרנדר ${done}/${tot}`,1);
+      }));
+    }
+    setStep(48,'מחלץ טקסט מהדוח...',1);
+    let pdfText='',sparsePages=0;
+    for(let pn=1;pn<=tot;pn++){
+      const pg=await pdf.getPage(pn);
+      const tc=await pg.getTextContent();
+      const items=tc.items.filter(it=>it.str&&it.str.trim());
+      const lineMap={};
+      items.forEach(it=>{
+        const y=Math.round(it.transform[5]/4)*4;
+        if(!lineMap[y])lineMap[y]=[];
+        lineMap[y].push(it);
+      });
+      const pageText=Object.keys(lineMap).map(Number).sort((a,b)=>b-a)
+        .map(y=>lineMap[y].sort((a,b)=>b.transform[4]-a.transform[4]).map(it=>it.str).join(' '))
+        .join('\n');
+      if(pageText.trim().length<50)sparsePages++;
+      pdfText+=`\n--- עמוד ${pn} ---\n${pageText}\n`;
+    }
+    if(sparsePages>0)sessionStorage.setItem('bdkl_ocr_warn',JSON.stringify({count:sparsePages,total:tot}));
+    setStep(50,`שולח ל-AI (${tot} עמודים)...`,2);
+    const t1=Date.now();
+    const TIPS=['מנתח חדרים...','בודק ליקויים לפי חדר...','מעבד ממצאים...','מחשב עלויות...','כמעט סיים...'];
+    let tipIdx=0;
+    const iv=setInterval(()=>{
+      const sec=Math.round((Date.now()-t1)/1000);
+      const tip=sec>120?TIPS[Math.min(tipIdx++,TIPS.length-1)]:'';
+      setStep(52+Math.min(sec/3,30),`AI מנתח... (${sec}ש) ${tip}`,2);
+    },1000);
+    const ctrl=new AbortController();
+    const timeout=setTimeout(()=>ctrl.abort(),660000); // 11 min hard limit
+    let res;
+    try{
+      res=await fetch('/api/analyze-simple',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({pdfText,propertyType:propType}),
+        signal:ctrl.signal
+      });
+    }finally{
+      clearInterval(iv);
+      clearTimeout(timeout);
+    }
+    if(!res.ok){const e=await res.json();throw new Error(e.error||'שגיאת שרת '+res.status);}
+    setStep(88,'מעבד תשובה...',3);
+    const js=await res.json();
+    if(js.analysisLog) console.log('[Bedekli Analysis Log]\n'+js.analysisLog.join('\n'));
+    const defects=js.defects||[];
+    const reportTotal=js.reportTotal||0;
+    const structureType=js.structureType||'rooms';
+    if(!defects.length)throw new Error('לא נמצאו ליקויות בדוח');
+    defects.forEach((d,i)=>{d.id=i;d.pageNum=Math.max(1,parseInt(d.pageNum)||parseInt(d.page)||1);});
+    setStep(100,`נמצאו ${defects.length} ממצאים`,4);
+    setTimeout(()=>goToReport(defects,file.name,reportTotal,structureType),500);
+  }catch(err){
+    const msg=err.name==='AbortError'?'הניתוח לקח יותר מדי זמן — נסה שוב':err.message;
+    setStep(100,'שגיאה: '+msg,0);
+    document.getElementById('upcard').style.display='';
+    // Show retry button
+    const existing=document.getElementById('retryBtn');
+    if(existing)existing.remove();
+    const rb=document.createElement('button');
+    rb.id='retryBtn';rb.className='up-cta';rb.textContent='נסה שוב';rb.style.marginTop='12px';
+    rb.onclick=()=>{pc.classList.remove('on');rb.remove();document.getElementById('fi').value='';};
+    pc.appendChild(rb);
+  }
+}
+
+function goToReport(defects,fileName,reportTotal,structureType){
+  try{sessionStorage.setItem('bdkl_imgs',JSON.stringify(PIMGS));}catch(e){PIMGS={};toast('תמונות לא נשמרו (קובץ גדול מדי) — ממשיך ללא תמונות');}
+  try{sessionStorage.setItem('bdkl_report',JSON.stringify({reportId:null,defects,fileName,propType,reportTotal:reportTotal||0,structureType:structureType||'rooms'}));}catch(e2){toast('שגיאת שמירה');return;}
+  window.location.href='/report.html';
+}
+
+function show(id){document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));document.getElementById(id).classList.add('on');}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('sh');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('sh'),2500);}
+</script>
+</body>
+</html>

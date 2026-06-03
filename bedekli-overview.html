@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>בדקלי — סקירת המוצר</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Heebo',sans-serif;background:#fff;color:#1a1a2e;direction:rtl;}
+
+  /* ── COVER ── */
+  .cover{
+    width:100%;min-height:100vh;
+    background:linear-gradient(135deg,#0f4c3a 0%,#1a7a5e 50%,#2ecc9a 100%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:60px 40px;text-align:center;page-break-after:always;
+  }
+  .cover-logo{
+    width:90px;height:90px;background:rgba(255,255,255,.15);border-radius:22px;
+    display:flex;align-items:center;justify-content:center;margin-bottom:28px;
+    box-shadow:0 8px 32px rgba(0,0,0,.2);
+  }
+  .cover-logo svg{width:52px;height:52px;}
+  .cover h1{font-size:56px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:8px;}
+  .cover h1 span{color:#7fffd4;}
+  .cover-sub{font-size:22px;font-weight:300;color:rgba(255,255,255,.85);margin-bottom:40px;}
+  .cover-tag{
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+    border-radius:30px;padding:10px 28px;font-size:15px;color:rgba(255,255,255,.9);
+    letter-spacing:.5px;
+  }
+  .cover-bottom{
+    position:absolute;bottom:40px;font-size:13px;color:rgba(255,255,255,.5);
+  }
+
+  /* ── CONTENT PAGES ── */
+  .page{
+    width:100%;max-width:800px;margin:0 auto;
+    padding:60px 56px;
+    page-break-after:always;
+  }
+  .page:last-child{page-break-after:auto;}
+
+  /* section header */
+  .sec-label{
+    font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+    color:#1a7a5e;margin-bottom:10px;
+  }
+  h2{font-size:32px;font-weight:800;color:#0f4c3a;line-height:1.2;margin-bottom:6px;}
+  h3{font-size:19px;font-weight:700;color:#1a7a5e;margin:28px 0 10px;}
+  .lead{font-size:17px;font-weight:400;color:#444;line-height:1.75;margin-bottom:24px;}
+  p{font-size:15px;color:#555;line-height:1.8;margin-bottom:14px;}
+  .divider{border:none;border-top:1.5px solid #e8f5f0;margin:32px 0;}
+
+  /* highlight box */
+  .hbox{
+    background:linear-gradient(135deg,#e8f5f0,#d0ede5);
+    border-right:4px solid #1a7a5e;border-radius:0 10px 10px 0;
+    padding:18px 22px;margin:20px 0;
+  }
+  .hbox p{margin:0;color:#0f4c3a;font-weight:500;}
+
+  /* cards grid */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0;}
+  .card{
+    background:#f8fffe;border:1px solid #c8e6dc;border-radius:12px;
+    padding:20px;
+  }
+  .card-icon{font-size:26px;margin-bottom:10px;}
+  .card h4{font-size:15px;font-weight:700;color:#0f4c3a;margin-bottom:6px;}
+  .card p{font-size:13px;color:#666;line-height:1.65;margin:0;}
+
+  /* feature list */
+  .feat-list{list-style:none;margin:16px 0;}
+  .feat-list li{
+    padding:10px 0;border-bottom:1px solid #f0f0f0;
+    display:flex;align-items:flex-start;gap:10px;font-size:14px;color:#444;line-height:1.6;
+  }
+  .feat-list li:last-child{border-bottom:none;}
+  .feat-list li::before{
+    content:'✓';color:#1a7a5e;font-weight:700;font-size:15px;flex-shrink:0;margin-top:1px;
+  }
+
+  /* sev pills */
+  .sev-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0;}
+  .sev{border-radius:10px;padding:14px 18px;}
+  .sev-c{background:#fff0ee;border-right:3px solid #c0392b;}
+  .sev-i{background:#fff8ee;border-right:3px solid #e67e22;}
+  .sev-m{background:#eef4ff;border-right:3px solid #2980b9;}
+  .sev-k{background:#f0fff4;border-right:3px solid #27ae60;}
+  .sev strong{font-size:13px;font-weight:700;display:block;margin-bottom:3px;}
+  .sev span{font-size:12px;color:#666;}
+  .sev-c strong{color:#c0392b;}
+  .sev-i strong{color:#e67e22;}
+  .sev-m strong{color:#2980b9;}
+  .sev-k strong{color:#27ae60;}
+
+  /* flow steps */
+  .flow{margin:20px 0;}
+  .step{display:flex;gap:16px;margin-bottom:20px;}
+  .step-num{
+    width:36px;height:36px;border-radius:50%;background:#1a7a5e;
+    color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;margin-top:2px;
+  }
+  .step-body h4{font-size:15px;font-weight:700;color:#0f4c3a;margin-bottom:4px;}
+  .step-body p{font-size:13px;color:#666;margin:0;line-height:1.6;}
+
+  /* comparison table */
+  table{width:100%;border-collapse:collapse;margin:20px 0;font-size:13px;}
+  th{background:#0f4c3a;color:#fff;padding:12px 14px;font-weight:600;text-align:right;}
+  td{padding:11px 14px;border-bottom:1px solid #eee;color:#444;}
+  tr:nth-child(even) td{background:#f8fffe;}
+  .yes{color:#1a7a5e;font-weight:700;}
+  .no{color:#bbb;}
+
+  /* footer strip */
+  .footer{
+    background:#0f4c3a;color:rgba(255,255,255,.7);
+    text-align:center;padding:22px;font-size:12px;
+    margin-top:auto;
+  }
+
+  @media print{
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .cover{min-height:100vh;}
+    .page{padding:48px 52px;}
+    a{color:inherit;text-decoration:none;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ════ COVER ════ -->
+<div class="cover" style="position:relative;">
+  <div class="cover-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+      <polyline points="9,22 9,12 15,12 15,22"/>
+    </svg>
+  </div>
+  <h1>בד<span>קלי</span></h1>
+  <div class="cover-sub">מערכת חכמה לניתוח דוחות בדק בית</div>
+  <div class="cover-tag">AI · דוחות PDF · ליקויות · עלויות · מעקב</div>
+  <div class="cover-bottom">סקירת מוצר — 2025</div>
+</div>
+
+<!-- ════ PAGE 1 · מהו בדקלי? ════ -->
+<div class="page">
+  <div class="sec-label">אודות המוצר</div>
+  <h2>מה זה בדקלי?</h2>
+  <p class="lead">בדקלי היא אפליקציית ווב חכמה שמנתחת אוטומטית דוחות בדק בית בפורמט PDF ומחלצת את כל הליקויות שנמצאו — מחולקות לפי אזורים, חומרה ועלות תיקון משוערת.</p>
+
+  <div class="hbox">
+    <p>הרעיון: במקום לקרוא עשרות עמודים של דוח טכני, תעלה PDF אחד ותקבל תוך דקות תמונה מלאה ומאורגנת של כל מה שצריך לדעת לפני שאתה חותם על עסקת הנדל"ן.</p>
+  </div>
+
+  <h3>למי זה מיועד?</h3>
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon">🏠</div>
+      <h4>רוכשי דירה ראשונה</h4>
+      <p>מקבלים תמונה ברורה של ליקויים בנכס לפני הרכישה — בלי לקרוא עמודים ארוכים של דוח הנדסי.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔄</div>
+      <h4>רוכשי יד שנייה</h4>
+      <p>מזהים ליקויים הנדסיים עם פוטנציאל הורדת מחיר ומנהלים מעקב מו"מ מול המוכר.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🏗️</div>
+      <h4>קבלנים ומתווכים</h4>
+      <p>מספקים ללקוחותיהם כלי מקצועי לניהול ומעקב אחר תיקונים ועלויות.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚖️</div>
+      <h4>עורכי דין ושמאים</h4>
+      <p>מסייע בתיעוד ממצאים ובהכנת תביעות בגין ליקויי בנייה.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 2 · תכונות ════ -->
+<div class="page">
+  <div class="sec-label">יכולות המערכת</div>
+  <h2>מה המערכת עושה?</h2>
+
+  <div class="flow">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h4>העלאת קובץ PDF</h4>
+        <p>גרור ושחרר או לחץ לבחירה. המערכת מרנדרת כל עמוד כתמונה ומחלצת את הטקסט המלא.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h4>ניתוח בינה מלאכותית</h4>
+        <p>מודל שפה גדול (LLM) קורא את הדוח, מאתר כל ליקוי — גם קל וגם חמור — ומחלץ אותו למבנה נתונים מסודר.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h4>תצוגה מאורגנת</h4>
+        <p>הליקויות מוצגות מקובצות לפי אזורים (מטבח, חדר אמבטיה, גג...), ממויינות לפי חומרה ועם תמונת הדף הרלוונטי.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h4>מעקב וניהול</h4>
+        <p>לכל ליקוי: סמן סטטוס (טופל / חלקי / לא טופל), הוסף הערות, עקוב אחר עלויות תיקון.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h4>ייצוא Excel</h4>
+        <p>שלח לקבלן, לעורך הדין או לבנק — דוח מסודר עם כל הליקויות, סטטוסים ועלויות.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 3 · חומרה ואזורים ════ -->
+<div class="page">
+  <div class="sec-label">סיווג ליקויות</div>
+  <h2>מערכת הדירוג</h2>
+  <p>כל ליקוי מסווג אוטומטית לאחת מארבע רמות חומרה:</p>
+
+  <div class="sev-grid">
+    <div class="sev sev-c">
+      <strong>קריטי</strong>
+      <span>סכנה בטיחותית או נזק קונסטרוקטיבי חמור — דורש טיפול דחוף לפני כניסה לדירה</span>
+    </div>
+    <div class="sev sev-i">
+      <strong>חשוב</strong>
+      <span>ליקוי הנדסי / תפקודי — משפיע על ערך הנכס ועל החיים בו, פוטנציאל מו"מ גבוה</span>
+    </div>
+    <div class="sev sev-m">
+      <strong>בינוני</strong>
+      <span>ליקוי שמפריע לשימוש אך לא מסוכן — כדאי לתקן בזמן הקרוב</span>
+    </div>
+    <div class="sev sev-k">
+      <strong>קוסמטי</strong>
+      <span>פגם אסתטי בלבד — אינו משפיע על הנכס אך ניתן לשאת במחיר תיקונו</span>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>אזורים מזוהים אוטומטית</h3>
+  <ul class="feat-list">
+    <li>מטבח, סלון, פינת אוכל</li>
+    <li>חדר שינה ראשי, חדרי שינה, חדר ילדים</li>
+    <li>חדר אמבטיה, שירותים</li>
+    <li>כניסה, מסדרון, מרפסת, מחסן</li>
+    <li>גג, חזית, חניה, קירות חיצוניים</li>
+    <li>ריצוף, תקרה, חלונות ודלתות</li>
+    <li>אינסטלציה, חשמל, מיזוג אוויר</li>
+  </ul>
+</div>
+
+<!-- ════ PAGE 4 · מצבי שימוש ════ -->
+<div class="page">
+  <div class="sec-label">מצבי עבודה</div>
+  <h2>שני מצבים בהתאם לסוג הנכס</h2>
+
+  <h3>מצב ראשון — דירה חדשה מקבלן</h3>
+  <p>מתמקד בתיעוד ומעקב אחר תיקונים. לכל ליקוי ניתן לסמן:</p>
+  <ul class="feat-list">
+    <li><strong>טופל במלואו</strong> — הקבלן ביצע את התיקון כנדרש</li>
+    <li><strong>טופל חלקית</strong> — עם שדות נפרדים: "מה בוצע" ו-"מה עוד נדרש"</li>
+    <li><strong>לא טופל</strong> — ממתין לטיפול</li>
+  </ul>
+
+  <hr class="divider">
+
+  <h3>מצב שני — יד שנייה (Yad2)</h3>
+  <p>ממוקד במו"מ ובהורדת מחיר. לכל ליקוי:</p>
+  <ul class="feat-list">
+    <li>חישוב פוטנציאל הורדת מחיר על פי עלות התיקון</li>
+    <li>סטטוס מו"מ: הוסכם / המוכר מתקן / פתוח</li>
+    <li>הערות מו"מ מפורטות</li>
+    <li>תצוגת סיכום "כמה חסכת" בפועל</li>
+  </ul>
+
+  <div class="hbox" style="margin-top:24px;">
+    <p>בשני המצבים: כל ליקוי מוצג עם תמונת הדף המקורי מהדוח, ציטוט מילולי ומיקום בדוח.</p>
+  </div>
+</div>
+
+<!-- ════ PAGE 5 · יתרונות ════ -->
+<div class="page">
+  <div class="sec-label">השוואה</div>
+  <h2>בדקלי לעומת קריאה ידנית</h2>
+
+  <table>
+    <tr>
+      <th>פרמטר</th>
+      <th>קריאה ידנית של הדוח</th>
+      <th>בדקלי</th>
+    </tr>
+    <tr>
+      <td>זמן לסיכום ממצאים</td>
+      <td>2–4 שעות</td>
+      <td class="yes">5–7 דקות</td>
+    </tr>
+    <tr>
+      <td>ארגון לפי אזורים</td>
+      <td class="no">ידני</td>
+      <td class="yes">אוטומטי</td>
+    </tr>
+    <tr>
+      <td>הערכת עלויות תיקון</td>
+      <td class="no">דורש מומחה</td>
+      <td class="yes">אוטומטית (AI)</td>
+    </tr>
+    <tr>
+      <td>מעקב סטטוס תיקונים</td>
+      <td class="no">גיליון אקסל ידני</td>
+      <td class="yes">ממשק מובנה</td>
+    </tr>
+    <tr>
+      <td>ייצוא לדוח</td>
+      <td class="no">פורמט PDF בלבד</td>
+      <td class="yes">Excel מסודר</td>
+    </tr>
+    <tr>
+      <td>הצגת תמונות מהדוח</td>
+      <td class="no">דפדוף ידני</td>
+      <td class="yes">לכל ליקוי בנפרד</td>
+    </tr>
+    <tr>
+      <td>API Key נדרש מהמשתמש</td>
+      <td>—</td>
+      <td class="yes">לא נדרש</td>
+    </tr>
+  </table>
+
+  <hr class="divider">
+
+  <h3>יתרונות טכניים</h3>
+  <ul class="feat-list">
+    <li>עובד ישירות בדפדפן — אין צורך בהתקנה</li>
+    <li>תומך בעברית מלאה (RTL) כולל ניתוח טקסט עברי</li>
+    <li>מפתח ה-API נשאר בצד השרת — המשתמש לא נחשף אליו</li>
+    <li>תמיכה בקבצי PDF עד 43 עמודים ומעלה</li>
+    <li>ממשק מותאם מובייל ודסקטופ</li>
+  </ul>
+</div>
+
+<!-- ════ FOOTER ════ -->
+<div class="footer">
+  בדקלי · מערכת חכמה לניתוח דוחות בדק בית · 2025
+</div>
+
+<script>
+  // Auto-open print dialog for PDF export
+  // window.onload = () => window.print();
+</script>
+</body>
+</html>

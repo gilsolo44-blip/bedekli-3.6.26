@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>בדקלי — הדוח שלך, בשפה שלך</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Alef:wght@400;700&family=Heebo:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#EEF1F8;
+  --card:#fff;
+  --border:#E0E5EF;--border2:#C9D1DF;
+  --ink:#0F1419;--ink2:#1A2130;--ink3:#3D4A5C;--ink4:#6B7685;--ink5:#9AA3AF;
+  --accent:#0066FF;--accent-dk:#004ECC;--accent-lt:#EBF2FF;--accent-glow:rgba(0,102,255,.14);
+  --success:#059669;--success-lt:#ECFDF5;
+  --glass:rgba(255,255,255,.78);
+  --r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:20px;--r-xl:26px;--r-full:9999px;
+  --sh-xs:0 1px 2px rgba(0,0,0,.04);
+  --sh-sm:0 2px 8px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.04);
+  --sh-md:0 6px 24px rgba(0,0,0,.07),0 2px 6px rgba(0,0,0,.04);
+  --sh-lg:0 16px 48px rgba(0,0,0,.1),0 4px 16px rgba(0,0,0,.05);
+  --sh-blue:0 0 0 1px rgba(0,102,255,.1),0 8px 28px rgba(0,102,255,.18);
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --smooth:cubic-bezier(.16,1,.3,1);
+  --decel:cubic-bezier(0,.55,.45,1);
+}
+html,body{font-family:'Heebo',sans-serif;background:#060C18;color:var(--ink);min-height:100dvh;-webkit-font-smoothing:antialiased;}
+.scr{display:none;}
+.scr.on{display:flex;flex-direction:column;min-height:100dvh;}
+
+/* ── KEYFRAMES ── */
+@keyframes orbDrift{
+  0%{transform:translate(0,0) scale(1);}
+  33%{transform:translate(24px,-18px) scale(1.04);}
+  66%{transform:translate(-14px,12px) scale(.97);}
+  100%{transform:translate(8px,-8px) scale(1.02);}
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+@keyframes slideIn{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:translateY(0);}}
+@keyframes breathe{0%,100%{opacity:.45;transform:scale(1);}50%{opacity:1;transform:scale(1.55);}}
+@keyframes shimmer{0%{transform:translateX(-100%);}100%{transform:translateX(100%);}}
+@keyframes gradShift{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+@keyframes floatUp{0%,100%{transform:translateY(0);}50%{transform:translateY(-5px);}}
+@keyframes scanLine{0%{transform:translateY(-100%);}100%{transform:translateY(400%);}}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   AUTH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#auth{
+  align-items:stretch;min-height:100dvh;
+  background:#060C18;position:relative;overflow:hidden;
+}
+
+/* Orbs — blue-only palette, zero purple/indigo */
+.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.28;pointer-events:none;animation:orbDrift 18s var(--smooth) infinite alternate;}
+.orb1{width:640px;height:640px;top:-12%;right:-8%;background:radial-gradient(circle,#0066FF 0%,#0EA5E9 55%,transparent 75%);animation-delay:0s;}
+.orb2{width:440px;height:440px;bottom:-10%;left:-6%;background:radial-gradient(circle,#1D4ED8 0%,#0284C7 60%,transparent 78%);animation-delay:-5s;}
+.orb3{width:280px;height:280px;top:42%;left:38%;background:radial-gradient(circle,#38BDF8 0%,#0EA5E9 65%,transparent 80%);animation-delay:-10s;opacity:.18;}
+
+/* Noise overlay */
+#auth::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity:.6;z-index:0;
+}
+
+.auth-wrap{
+  display:grid;grid-template-columns:1.1fr .9fr;
+  max-width:960px;width:100%;margin:auto;
+  min-height:100dvh;position:relative;z-index:1;
+  padding:0 24px;
+}
+.auth-brand{
+  padding:72px 48px 72px 0;display:flex;flex-direction:column;
+  justify-content:center;color:white;
+}
+.auth-brand-logo{
+  display:flex;align-items:center;gap:11px;
+  font-family:'Alef',sans-serif;font-weight:700;font-size:22px;
+  color:rgba(255,255,255,.9);margin-bottom:48px;
+  animation:fadeUp .55s var(--smooth) both;
+}
+.auth-brand-ico{
+  width:38px;height:38px;
+  background:rgba(0,102,255,.22);border:1.5px solid rgba(0,102,255,.4);
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(12px);
+}
+.auth-brand-ico svg{width:17px;height:17px;}
+.auth-brand-h{
+  font-family:'Alef',sans-serif;
+  font-size:clamp(32px,3.8vw,48px);font-weight:700;
+  line-height:1.1;letter-spacing:-.6px;margin-bottom:14px;
+  animation:fadeUp .55s var(--smooth) .08s both;color:white;
+}
+.auth-brand-h em{
+  font-style:normal;
+  background:linear-gradient(135deg,#60A5FA,#38BDF8,#0EA5E9);
+  background-size:200% 200%;animation:gradShift 6s ease infinite;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.auth-brand-p{
+  font-size:14.5px;line-height:1.9;
+  color:rgba(255,255,255,.5);max-width:320px;
+  animation:fadeUp .55s var(--smooth) .16s both;margin-bottom:36px;
+}
+.auth-features{
+  display:flex;flex-direction:column;gap:12px;
+  animation:fadeUp .55s var(--smooth) .24s both;
+}
+.af{
+  display:flex;align-items:center;gap:10px;
+  font-size:13px;color:rgba(255,255,255,.65);font-weight:500;
+}
+.af-dot{
+  width:20px;height:20px;border-radius:6px;flex-shrink:0;
+  background:rgba(0,102,255,.18);border:1px solid rgba(0,102,255,.3);
+  display:flex;align-items:center;justify-content:center;
+}
+.af-dot svg{width:10px;height:10px;color:#60A5FA;}
+
+.auth-form-wrap{
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 0 40px 40px;
+}
+.auth-card{
+  background:white;border-radius:24px;padding:40px 36px;
+  width:100%;max-width:388px;
+  box-shadow:0 32px 80px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.8);
+  animation:slideIn .55s var(--smooth) .06s both;
+}
+.auth-logo{
+  display:flex;align-items:center;gap:9px;
+  font-family:'Alef',sans-serif;font-weight:700;font-size:17px;
+  color:var(--accent);margin-bottom:4px;
+}
+.auth-logo-ico{
+  width:28px;height:28px;background:var(--accent);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+}
+.auth-logo-ico svg{width:13px;height:13px;}
+.auth-tagline{font-size:11.5px;color:var(--ink5);margin-bottom:26px;}
+.auth-tabs{
+  display:grid;grid-template-columns:1fr 1fr;
+  background:var(--bg);border-radius:var(--r-sm);
+  padding:3px;gap:2px;margin-bottom:22px;
+}
+.atab{
+  padding:9px;text-align:center;font-size:13px;font-weight:600;
+  cursor:pointer;background:transparent;color:var(--ink4);
+  border:none;font-family:'Heebo',sans-serif;border-radius:8px;
+  transition:all 200ms var(--smooth);
+}
+.atab.act{background:white;color:var(--accent);box-shadow:var(--sh-sm);}
+.auth-field{margin-bottom:13px;}
+.auth-field label{
+  display:block;font-size:10px;font-weight:700;color:var(--ink4);
+  margin-bottom:5px;letter-spacing:.07em;text-transform:uppercase;
+}
+.auth-input{
+  width:100%;padding:11px 13px;
+  border:1.5px solid var(--border);border-radius:var(--r-md);
+  font-family:'Heebo',sans-serif;font-size:13.5px;
+  background:var(--bg);color:var(--ink);outline:none;
+  transition:all 200ms var(--smooth);direction:ltr;text-align:left;
+}
+.auth-input:focus{border-color:var(--accent);background:white;box-shadow:var(--sh-blue);}
+.auth-btn{
+  width:100%;padding:12.5px;background:var(--accent);color:white;
+  font-family:'Heebo',sans-serif;font-size:14.5px;font-weight:700;
+  border:none;border-radius:var(--r-full);cursor:pointer;
+  transition:all 200ms var(--decel);margin-top:5px;
+  box-shadow:var(--sh-blue);
+}
+.auth-btn:hover{background:var(--accent-dk);transform:translateY(-1px);box-shadow:0 0 0 1px rgba(0,102,255,.15),0 14px 40px rgba(0,102,255,.32);}
+.auth-btn:active{transform:scale(.97) translateY(0);}
+.auth-btn:disabled{background:var(--border2);color:var(--ink5);cursor:not-allowed;transform:none;box-shadow:none;}
+.auth-err{font-size:11.5px;color:#DC2626;margin-top:7px;min-height:16px;text-align:center;}
+.auth-note{font-size:10.5px;color:var(--ink5);text-align:center;margin-top:14px;line-height:1.75;}
+
+@media(max-width:640px){
+  .auth-wrap{grid-template-columns:1fr;padding:0 16px;}
+  .auth-brand{display:none;}
+  .auth-form-wrap{padding:60px 0 40px;align-items:flex-start;}
+  .auth-card{padding:32px 22px;}
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   APP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#app{background:var(--bg);}
+#app::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 55% 35% at 0% 0%,rgba(0,102,255,.05) 0%,transparent 65%),
+    radial-gradient(ellipse 40% 28% at 100% 100%,rgba(0,102,255,.04) 0%,transparent 60%);
+}
+
+/* TOPBAR */
+.topbar{
+  background:var(--glass);backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-bottom:1px solid rgba(255,255,255,.6);
+  padding:0 24px;height:54px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+  box-shadow:0 1px 0 var(--border),0 2px 12px rgba(0,0,0,.04);
+}
+.logo{
+  font-family:'Alef',sans-serif;font-weight:700;font-size:17px;
+  color:var(--accent);display:flex;align-items:center;gap:8px;cursor:pointer;
+}
+.lb{width:26px;height:26px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;}
+.lb svg{width:12px;height:12px;}
+.topbar-right{display:flex;align-items:center;gap:6px;}
+.user-badge{
+  font-size:11px;font-weight:600;padding:4px 10px;border-radius:var(--r-full);
+  background:var(--accent-lt);color:var(--accent);
+  border:1px solid rgba(0,102,255,.14);font-family:'JetBrains Mono',monospace;
+}
+.tbtn{
+  display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:var(--r-full);
+  font-size:12px;font-weight:500;font-family:'Heebo',sans-serif;cursor:pointer;
+  border:1px solid var(--border);background:white;color:var(--ink4);
+  transition:all 120ms var(--decel);box-shadow:var(--sh-xs);
+}
+.tbtn:hover{color:var(--accent);border-color:rgba(0,102,255,.25);box-shadow:var(--sh-sm);}
+.tbtn:active{transform:scale(.96);}
+
+/* MAIN */
+.main{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;padding:32px 16px 80px;}
+.content-col{width:100%;max-width:500px;display:flex;flex-direction:column;gap:0;}
+
+/* GREETING */
+.greeting{
+  margin-bottom:26px;
+  animation:fadeUp .5s var(--smooth) .04s both;
+}
+.greeting-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.greeting-name{
+  font-family:'Alef',sans-serif;font-size:22px;font-weight:700;
+  color:var(--ink);letter-spacing:-.3px;
+}
+.greeting-name span{color:var(--accent);}
+.greeting-sub{font-size:13px;color:var(--ink4);line-height:1.5;}
+.usage-pill{
+  display:flex;align-items:center;gap:5px;
+  background:white;border:1px solid var(--border);
+  border-radius:var(--r-full);padding:4px 10px 4px 8px;
+  font-size:11px;font-weight:600;color:var(--ink3);
+  box-shadow:var(--sh-xs);
+  font-family:'JetBrains Mono',monospace;
+}
+.usage-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:breathe 2.4s ease-in-out infinite;}
+
+/* STEPS */
+.steps-row{
+  display:flex;gap:0;background:white;border:1px solid var(--border);
+  border-radius:var(--r-lg);overflow:hidden;margin-bottom:20px;
+  box-shadow:var(--sh-sm);
+  animation:fadeUp .5s var(--smooth) .1s both;
+}
+.step{
+  flex:1;padding:12px 10px;text-align:center;position:relative;
+  border-left:1px solid var(--border);
+}
+.step:last-child{border-left:none;}
+.step-n{
+  width:20px;height:20px;border-radius:50%;background:var(--bg);
+  font-size:10px;font-weight:800;color:var(--ink4);
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 5px;border:1.5px solid var(--border2);
+  font-family:'JetBrains Mono',monospace;
+  transition:all .25s var(--smooth);
+}
+.step.act .step-n{background:var(--accent);border-color:var(--accent);color:white;box-shadow:0 2px 8px rgba(0,102,255,.3);}
+.step-t{font-size:10.5px;font-weight:700;color:var(--ink4);letter-spacing:.01em;}
+.step.act .step-t{color:var(--ink2);}
+.step-done .step-n{background:var(--success-lt);border-color:#6EE7B7;color:var(--success);}
+.step-done .step-t{color:var(--success);}
+
+/* SECTION LABEL */
+.sec-lbl{
+  font-size:10px;font-weight:700;color:var(--ink5);
+  letter-spacing:.1em;text-transform:uppercase;
+  margin-bottom:8px;font-family:'JetBrains Mono',monospace;
+}
+
+/* TYPE SELECTOR */
+.type-wrap{
+  margin-bottom:16px;
+  animation:fadeUp .5s var(--smooth) .18s both;
+}
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.topt{
+  border:1.5px solid var(--border);border-radius:var(--r-lg);
+  padding:18px 15px;cursor:pointer;transition:all 280ms var(--smooth);
+  background:white;text-align:right;position:relative;
+  box-shadow:var(--sh-sm);overflow:hidden;
+}
+.topt::before{
+  content:'';position:absolute;top:0;right:0;left:0;height:2.5px;
+  background:linear-gradient(90deg,var(--accent),#38BDF8);
+  transform:scaleX(0);transform-origin:right;
+  transition:transform .3s var(--smooth);
+}
+.topt:hover{border-color:rgba(0,102,255,.35);transform:translateY(-2px);box-shadow:var(--sh-md);}
+.topt.sel{border-color:var(--accent);border-width:2px;box-shadow:var(--sh-blue);}
+.topt.sel::before{transform:scaleX(1);}
+.topt.sel .tck{opacity:1;transform:scale(1);}
+.tck{
+  position:absolute;top:11px;left:11px;
+  width:18px;height:18px;background:var(--accent);color:white;
+  border-radius:50%;font-size:9px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:scale(.2);transition:all .28s var(--spring);
+  box-shadow:0 2px 8px rgba(0,102,255,.35);
+}
+.topt-ico{
+  width:34px;height:34px;border-radius:9px;background:var(--accent-lt);
+  display:flex;align-items:center;justify-content:center;margin-bottom:9px;
+  transition:all .25s var(--smooth);
+}
+.topt-ico svg{width:16px;height:16px;color:var(--accent);}
+.topt.sel .topt-ico{background:rgba(0,102,255,.12);}
+.topt-name{font-family:'Alef',sans-serif;font-size:13.5px;font-weight:700;margin-bottom:2px;color:var(--ink);}
+.topt-desc{font-size:10.5px;color:var(--ink5);line-height:1.45;}
+.topt-tag{
+  display:inline-block;margin-top:7px;font-size:9px;font-weight:700;
+  padding:2.5px 7px;border-radius:5px;letter-spacing:.03em;
+  background:var(--accent-lt);color:var(--accent);
+}
+.ty2 .topt-ico{background:var(--success-lt);}
+.ty2 .topt-ico svg{color:var(--success);}
+.ty2 .topt.sel{border-color:var(--success);box-shadow:0 0 0 1px rgba(5,150,105,.1),0 8px 28px rgba(5,150,105,.14);}
+.ty2 .topt.sel::before{background:linear-gradient(90deg,var(--success),#34D399);}
+.ty2 .tck{background:var(--success);box-shadow:0 2px 8px rgba(5,150,105,.3);}
+.ty2 .topt-tag{background:var(--success-lt);color:var(--success);}
+.ty2 .topt.sel .topt-ico{background:rgba(5,150,105,.1);}
+
+/* UPLOAD CARD */
+.upload-wrap{
+  margin-bottom:24px;
+  animation:fadeUp .5s var(--smooth) .26s both;
+}
+.upcard{
+  background:white;border:2px dashed var(--border2);
+  border-radius:var(--r-xl);padding:42px 28px;
+  cursor:pointer;text-align:center;
+  transition:all 300ms var(--smooth);
+  box-shadow:var(--sh-sm);position:relative;overflow:hidden;
+}
+.upcard-glow{
+  position:absolute;inset:0;border-radius:var(--r-xl);
+  background:radial-gradient(circle at 50% 50%,rgba(0,102,255,.04) 0%,transparent 65%);
+  pointer-events:none;opacity:0;transition:opacity .3s;
+}
+.upcard:hover .upcard-glow,.upcard.dov .upcard-glow{opacity:1;}
+.upcard:hover,.upcard.dov{
+  border-color:var(--accent);border-style:solid;
+  transform:translateY(-4px);box-shadow:var(--sh-blue);
+}
+.up-icon-wrap{
+  width:64px;height:64px;margin:0 auto 16px;position:relative;
+}
+.up-icon{
+  width:64px;height:64px;background:var(--bg);border-radius:var(--r-lg);
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--border);
+  transition:all 300ms var(--smooth);
+}
+.upcard:hover .up-icon,.upcard.dov .up-icon{
+  background:var(--accent-lt);border-color:rgba(0,102,255,.2);
+  animation:floatUp 1.8s ease-in-out infinite;
+}
+.up-icon svg{width:26px;height:26px;color:var(--ink4);transition:color .3s;}
+.upcard:hover .up-icon svg,.upcard.dov .up-icon svg{color:var(--accent);}
+
+/* Scanner effect */
+.up-icon-wrap::after{
+  content:'';position:absolute;inset:0;border-radius:var(--r-lg);
+  background:linear-gradient(transparent 0%,rgba(0,102,255,.12) 50%,transparent 100%);
+  animation:scanLine 2.5s ease-in-out infinite;opacity:0;
+  pointer-events:none;transition:opacity .3s;
+}
+.upcard:hover .up-icon-wrap::after,.upcard.dov .up-icon-wrap::after{opacity:1;}
+
+.up-title{font-family:'Alef',sans-serif;font-size:17px;font-weight:700;margin-bottom:5px;color:var(--ink);}
+.up-sub{font-size:12.5px;color:var(--ink4);margin-bottom:20px;line-height:1.65;}
+.up-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--accent);color:white;
+  font-family:'Heebo',sans-serif;font-size:13.5px;font-weight:700;
+  padding:11px 22px;border-radius:var(--r-full);border:none;cursor:pointer;
+  transition:all 200ms var(--decel);box-shadow:var(--sh-blue);
+}
+.up-btn:hover{background:var(--accent-dk);transform:translateY(-1px);box-shadow:0 12px 36px rgba(0,102,255,.3);}
+.up-btn:active{transform:scale(.96);}
+.up-chips{display:flex;justify-content:center;gap:5px;margin-top:15px;}
+.up-chip{
+  font-size:10.5px;color:var(--ink5);background:var(--bg);
+  border:1px solid var(--border);padding:3px 9px;border-radius:5px;font-weight:500;
+}
+input[type=file]{display:none;}
+
+/* PROGRESS CARD */
+.prog-card{
+  background:white;border-radius:var(--r-xl);padding:28px 24px;
+  width:100%;margin-bottom:24px;
+  box-shadow:var(--sh-lg);display:none;text-align:center;
+  border:1px solid var(--border);
+}
+.prog-card.on{display:block;animation:slideIn .3s var(--smooth) both;}
+.prog-fname{
+  font-family:'Alef',sans-serif;font-size:13px;font-weight:700;
+  margin-bottom:18px;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.prog-steps{display:flex;justify-content:center;gap:5px;margin-bottom:13px;}
+.ps{width:7px;height:7px;border-radius:50%;background:var(--border);transition:all 300ms var(--smooth);}
+.ps.act{background:var(--accent);width:20px;border-radius:4px;animation:breathe 1.3s ease-in-out infinite;}
+.ps.dn{background:rgba(0,102,255,.35);}
+.prog-bar-wrap{background:var(--bg);border-radius:var(--r-full);height:3px;overflow:hidden;margin-bottom:7px;position:relative;}
+.prog-bar-fill{
+  height:100%;border-radius:var(--r-full);
+  background:linear-gradient(90deg,var(--accent-dk),var(--accent),#38BDF8);
+  background-size:200% 100%;
+  animation:shimmer 2s linear infinite;
+  transition:width .5s var(--smooth);
+}
+.prog-lbl{font-size:10.5px;color:var(--ink4);min-height:16px;font-family:'JetBrains Mono',monospace;}
+
+/* REPORTS */
+.reports-sec{
+  width:100%;
+  animation:fadeUp .5s var(--smooth) .34s both;
+}
+.rep-list{display:flex;flex-direction:column;gap:5px;}
+.rep-item{
+  background:white;border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:12px 15px;display:flex;align-items:center;gap:11px;cursor:pointer;
+  transition:all 190ms var(--smooth);text-decoration:none;
+  box-shadow:var(--sh-xs);
+  animation:fadeUp .42s var(--smooth) calc(var(--i,0)*50ms) both;
+}
+.rep-item:hover{border-color:rgba(0,102,255,.28);box-shadow:var(--sh-sm);transform:translateY(-1px);}
+.rep-item:active{transform:scale(.985);}
+.rep-ico{
+  width:34px;height:34px;background:var(--accent-lt);border-radius:var(--r-sm);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  border:1px solid rgba(0,102,255,.12);
+}
+.rep-ico svg{width:14px;height:14px;color:var(--accent);}
+.rep-ico.g2{background:var(--success-lt);border-color:rgba(5,150,105,.12);}
+.rep-ico.g2 svg{color:var(--success);}
+.rep-info{flex:1;min-width:0;}
+.rep-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);}
+.rep-meta{font-size:10.5px;color:var(--ink5);margin-top:2px;}
+.rep-meta span{color:var(--ink4);}
+.rep-arr{color:var(--border2);flex-shrink:0;transition:all .15s;}
+.rep-item:hover .rep-arr{color:var(--accent);}
+.rep-arr svg{width:13px;height:13px;}
+.no-reports{
+  font-size:12.5px;color:var(--ink5);text-align:center;
+  padding:28px;background:white;border-radius:var(--r-lg);
+  border:1px dashed var(--border2);line-height:1.75;box-shadow:var(--sh-xs);
+}
+.no-reports strong{display:block;font-size:14px;color:var(--ink3);margin-bottom:4px;font-family:'Alef',sans-serif;}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:28px;left:50%;
+  transform:translateX(-50%) translateY(36px);
+  background:var(--ink2);color:white;padding:9px 18px;
+  border-radius:var(--r-full);font-size:12px;font-weight:500;
+  transition:all 240ms var(--smooth);z-index:300;pointer-events:none;opacity:0;
+  box-shadow:0 6px 24px rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.08);
+}
+.toast.sh{transform:translateX(-50%) translateY(0);opacity:1;}
+
+@media(max-width:600px){
+  .topbar{padding:0 14px;}
+  .main{padding:24px 12px 60px;}
+  .type-grid{gap:8px;}
+  .steps-row{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ━━━━━━━━━━━━━━━━━━ AUTH ━━━━━━━━━━━━━━━━━━ -->
+<div id="auth" class="scr on">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <div class="auth-brand-logo">
+        <div class="auth-brand-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        </div>
+        בדקלי
+      </div>
+      <h1 class="auth-brand-h">הדוח שלך,<br>ב<em>שפה שלך</em></h1>
+      <p class="auth-brand-p">קיבלת דוח בדק בית? תן ל-AI לנתח אותו — כל הממצאים בעברית פשוטה, מסודרים לפי חדרים וחומרה.</p>
+      <div class="auth-features">
+        <div class="af">
+          <div class="af-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          ניתוח מלא תוך דקות עם Claude AI
+        </div>
+        <div class="af">
+          <div class="af-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          ליקויות ממוינות לפי חדר, קטגוריה וחומרה
+        </div>
+        <div class="af">
+          <div class="af-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          ייצוא לאקסל לשיתוף עם הקבלן
+        </div>
+        <div class="af">
+          <div class="af-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          הנתונים שלך מוצפנים ופרטיים לחלוטין
+        </div>
+      </div>
+    </div>
+    <div class="auth-form-wrap">
+      <div class="auth-card">
+        <div class="auth-logo">
+          <div class="auth-logo-ico"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+          בדקלי
+        </div>
+        <div class="auth-tagline">הדוח שלך, בשפה שלך</div>
+        <div class="auth-tabs">
+          <button class="atab act" id="tabLogin" onclick="switchTab('login')">כניסה</button>
+          <button class="atab" id="tabReg" onclick="switchTab('register')">הרשמה</button>
+        </div>
+        <div class="auth-field">
+          <label>אימייל</label>
+          <input class="auth-input" type="email" id="authEmail" placeholder="your@email.com" autocomplete="email">
+        </div>
+        <div class="auth-field">
+          <label>סיסמה</label>
+          <input class="auth-input" type="password" id="authPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()">
+        </div>
+        <div class="auth-err" id="authErr"></div>
+        <button class="auth-btn" id="authBtn" onclick="doAuth()">כניסה</button>
+        <p class="auth-note">הנתונים שלך מוצפנים ומאובטחים.<br>הדוחות פרטיים ונגישים רק לך.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━ APP ━━━━━━━━━━━━━━━━━━ -->
+<div id="app" class="scr">
+  <nav class="topbar">
+    <div class="logo">
+      <div class="lb"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+      בדקלי
+    </div>
+    <div class="topbar-right">
+      <span class="user-badge" id="userBadge"></span>
+      <button class="tbtn" onclick="doSignOut()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        יציאה
+      </button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="content-col">
+
+      <!-- Greeting -->
+      <div class="greeting">
+        <div class="greeting-row">
+          <div class="greeting-name">ניתוח דוח בדק <span>חדש</span></div>
+          <div class="usage-pill">
+            <div class="usage-dot"></div>
+            <span id="usageTxt">5/5 נותרו</span>
+          </div>
+        </div>
+        <div class="greeting-sub">בחר סוג נכס, העלה את קובץ ה-PDF וקבל ניתוח מלא</div>
+      </div>
+
+      <!-- Steps indicator -->
+      <div class="steps-row">
+        <div class="step act" id="s1"><div class="step-n">1</div><div class="step-t">סוג נכס</div></div>
+        <div class="step" id="s2"><div class="step-n">2</div><div class="step-t">העלאה</div></div>
+        <div class="step" id="s3"><div class="step-n">3</div><div class="step-t">ניתוח AI</div></div>
+        <div class="step" id="s4"><div class="step-n">4</div><div class="step-t">הדוח מוכן</div></div>
+      </div>
+
+      <!-- Type selector -->
+      <div class="type-wrap">
+        <div class="sec-lbl">סוג הנכס</div>
+        <div class="type-grid">
+          <div class="topt sel" id="tnew" onclick="selType('new')">
+            <div class="tck">✓</div>
+            <div class="topt-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="11" x2="13" y2="11"/></svg>
+            </div>
+            <div class="topt-name">דירה חדשה מקבלן</div>
+            <div class="topt-desc">מסירה ראשונה · בנייה חדשה</div>
+            <span class="topt-tag">חוק מכר · אחריות קבלן</span>
+          </div>
+          <div class="topt ty2" id="ty2" onclick="selType('yad2')">
+            <div class="tck">✓</div>
+            <div class="topt-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+            </div>
+            <div class="topt-name">דירה יד שנייה</div>
+            <div class="topt-desc">רכישה מבעלים קודמים</div>
+            <span class="topt-tag">מו"מ · תקציב תיקונים</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload zone -->
+      <div class="upload-wrap">
+        <div class="sec-lbl">קובץ PDF</div>
+        <div class="upcard" id="upcard">
+          <div class="upcard-glow"></div>
+          <div class="up-icon-wrap">
+            <div class="up-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            </div>
+          </div>
+          <div class="up-title">העלה את דוח הבדק שלך</div>
+          <div class="up-sub">גרור PDF לכאן, או לחץ לבחירה</div>
+          <button class="up-btn" onclick="event.stopPropagation();document.getElementById('fi').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            בחר קובץ PDF
+          </button>
+          <div class="up-chips">
+            <span class="up-chip">PDF בלבד</span>
+            <span class="up-chip">עד 50MB</span>
+            <span class="up-chip">מוצפן ומאובטח</span>
+          </div>
+        </div>
+        <input type="file" id="fi" accept=".pdf,application/pdf">
+      </div>
+
+      <!-- Progress card -->
+      <div class="prog-card" id="progCard">
+        <div class="prog-fname" id="progFname"></div>
+        <div class="prog-steps">
+          <div class="ps" id="pd1"></div>
+          <div class="ps" id="pd2"></div>
+          <div class="ps" id="pd3"></div>
+          <div class="ps" id="pd4"></div>
+        </div>
+        <div class="prog-bar-wrap"><div class="prog-bar-fill" id="progFill" style="width:0%"></div></div>
+        <div class="prog-lbl" id="progLbl"></div>
+      </div>
+
+      <!-- Reports -->
+      <div class="reports-sec" id="reportsSec">
+        <div class="sec-lbl">הדוחות שלי</div>
+        <div class="rep-list" id="repList"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL  = 'https://zjlqftmxgjquwukracyh.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqbHFmdG14Z2pxdXd1a3JhY3loIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MTY0MDAsImV4cCI6MjA5MTk5MjQwMH0.At4RlTualEGMN2KiqD0gs-bDWj1NsnSf9rQ1CFqdX2M';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let currentUser = null, propType = 'new', PIMGS = {};
+
+(async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) enterApp(session.user); else showAuth();
+  sb.auth.onAuthStateChange((_, session) => { if (session) enterApp(session.user); else showAuth(); });
+  const card = document.getElementById('upcard'), fi = document.getElementById('fi');
+  fi.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  card.addEventListener('click', e => { if (!e.target.closest('.up-btn')) fi.click(); });
+  card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('dov'); });
+  card.addEventListener('dragleave', e => { if (!card.contains(e.relatedTarget)) card.classList.remove('dov'); });
+  card.addEventListener('drop', e => { e.preventDefault(); card.classList.remove('dov'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+})();
+
+let authMode = 'login';
+function switchTab(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('act', mode === 'login');
+  document.getElementById('tabReg').classList.toggle('act', mode === 'register');
+  document.getElementById('authBtn').textContent = mode === 'login' ? 'כניסה' : 'הרשמה';
+  document.getElementById('authErr').textContent = '';
+}
+async function doAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass = document.getElementById('authPass').value;
+  const btn = document.getElementById('authBtn'), err = document.getElementById('authErr');
+  if (!email || !pass) { err.textContent = 'נא למלא אימייל וסיסמה'; return; }
+  btn.disabled = true; err.textContent = '';
+  const fn = authMode === 'login'
+    ? sb.auth.signInWithPassword({ email, password: pass })
+    : sb.auth.signUp({ email, password: pass });
+  const { error } = await fn;
+  btn.disabled = false;
+  if (error) { err.textContent = error.message; return; }
+  if (authMode === 'register') { err.style.color = 'var(--success)'; err.textContent = 'נשלח אימייל אימות — בדוק את תיבת הדואר'; }
+}
+async function doSignOut() { await sb.auth.signOut(); }
+function showAuth() { currentUser = null; show('auth'); }
+async function enterApp(user) {
+  currentUser = user;
+  document.getElementById('userBadge').textContent = (user.email || '').split('@')[0];
+  show('app');
+  loadReports();
+  loadUsage(user.id);
+}
+async function loadUsage(userId) {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/usage?user_id=eq.${userId}&date=eq.${today}`, {
+      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${(await sb.auth.getSession()).data.session?.access_token}` }
+    });
+    const d = await r.json();
+    const used = d[0]?.count || 0;
+    const rem = Math.max(0, 5 - used);
+    document.getElementById('usageTxt').textContent = `${rem}/5 נותרו`;
+  } catch(e) {}
+}
+function selType(t) {
+  propType = t;
+  document.getElementById('tnew').classList.toggle('sel', t === 'new');
+  document.getElementById('ty2').classList.toggle('sel', t === 'yad2');
+}
+function setStep(pct, lbl, ph) {
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progLbl').textContent = lbl;
+  if (ph !== undefined) {
+    [1,2,3,4].forEach((n, i) => {
+      document.getElementById('pd'+n).className = 'ps' + (i < ph ? ' dn' : i === ph ? ' act' : '');
+    });
+    [1,2,3,4].forEach((n, i) => {
+      const el = document.getElementById('s'+n);
+      if (!el) return;
+      el.className = 'step' + (i < ph ? ' step-done' : i === ph ? ' act' : '');
+    });
+  }
+}
+function b64(buf) {
+  const bytes = new Uint8Array(buf); let s = '';
+  for (let i = 0; i < bytes.length; i += 8192)
+    s += String.fromCharCode(...bytes.subarray(i, Math.min(i + 8192, bytes.length)));
+  return btoa(s);
+}
+async function handleFile(file) {
+  if (!file) return;
+  PIMGS = {};
+  document.getElementById('upcard').style.display = 'none';
+  const pc = document.getElementById('progCard');
+  pc.classList.add('on');
+  document.getElementById('progFname').textContent = file.name;
+  setStep(5, 'טוען קובץ...', 0);
+  try {
+    const buf = await file.arrayBuffer();
+    setStep(12, 'פותח PDF...', 0);
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf), disableFontFace: true }).promise;
+    const tot = pdf.numPages; let done = 0; const t0 = Date.now();
+    for (let i = 1; i <= tot; i += 5) {
+      await Promise.all(Array.from({ length: Math.min(5, tot - i + 1) }, (_, j) => i + j).map(async pn => {
+        const pg = await pdf.getPage(pn);
+        const vp = pg.getViewport({ scale: 1.4 });
+        const cv = document.createElement('canvas');
+        cv.width = vp.width; cv.height = vp.height;
+        await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        pg.cleanup();
+        PIMGS[pn] = cv.toDataURL('image/jpeg', .78);
+        done++;
+        const el = (Date.now() - t0) / 1000;
+        const rem = done > 3 && el > 0 ? (tot - done) / (done / el) : null;
+        setStep(12 + Math.round(done / tot * 36), rem ? `מרנדר ${done}/${tot} · עוד ~${Math.round(rem)}ש` : `מרנדר ${done}/${tot}`, 1);
+      }));
+    }
+    const { data: { session } } = await sb.auth.getSession();
+    setStep(50, 'מעלה קובץ לשרת...', 2);
+    const safeName = encodeURIComponent(file.name.replace(/[^\w.\-]/g, '_'));
+    const storagePath = `${session.user.id}/${Date.now()}_${safeName}`;
+    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/reports/${storagePath}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON, 'Content-Type': 'application/pdf', 'x-upsert': 'false' },
+      body: file
+    });
+    if (!uploadRes.ok) { const errTxt = await uploadRes.text(); throw new Error('שגיאה בהעלאת הקובץ: ' + errTxt); }
+    const signRes = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/reports/${storagePath}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 300 })
+    });
+    const signData = await signRes.json();
+    const signedUrl = `${SUPABASE_URL}/storage/v1${signData.signedURL}`;
+    if (!signData.signedURL) throw new Error('לא ניתן ליצור קישור לקובץ');
+    setStep(55, `שולח ל-AI (${tot} עמודים)...`, 2);
+    const t1 = Date.now();
+    const iv = setInterval(() => setStep(57, `AI מנתח... (${Math.round((Date.now() - t1) / 1000)}ש)`, 2), 1000);
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_ANON },
+      body: JSON.stringify({ pdfUrl: signedUrl, fileName: file.name, propertyType: propType })
+    });
+    clearInterval(iv);
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'שגיאת שרת'); }
+    setStep(90, 'מעבד תשובה...', 3);
+    const { reportId, defects } = await res.json();
+    defects.forEach(d => { const pn = Math.max(1, parseInt((d.pageNums || [])[0]) || 1); d.pageImg = PIMGS[pn] || null; d.pageNum = pn; });
+    setStep(100, `נמצאו ${defects.length} ממצאים`, 4);
+    setTimeout(() => goToReport(reportId, defects, file.name), 600);
+  } catch (err) {
+    setStep(100, err.message, 0);
+    document.getElementById('upcard').style.display = '';
+    setTimeout(() => { pc.classList.remove('on'); document.getElementById('progFill').style.width = '0%'; }, 3000);
+  }
+}
+function goToReport(reportId, defects, fileName) {
+  sessionStorage.setItem('bdkl_report', JSON.stringify({ reportId, defects, fileName, propType }));
+  window.location.href = '/report.html';
+}
+async function loadReports() {
+  const { data, error } = await sb.from('reports').select('id, file_name, property_type, created_at').order('created_at', { ascending: false }).limit(10);
+  const list = document.getElementById('repList');
+  if (error || !data?.length) {
+    list.innerHTML = '<div class="no-reports"><strong>עדיין אין דוחות שמורים</strong>העלה את הדוח הראשון שלך כדי להתחיל</div>';
+    return;
+  }
+  list.innerHTML = data.map((r, i) => {
+    const date = new Date(r.created_at).toLocaleDateString('he-IL');
+    const isYad2 = r.property_type === 'yad2';
+    const type = isYad2 ? 'יד שנייה' : 'דירה חדשה';
+    const icoClass = isYad2 ? 'rep-ico g2' : 'rep-ico';
+    const icon = isYad2
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`;
+    return `<a class="rep-item" style="--i:${i}" onclick="openSavedReport('${r.id}')">
+      <div class="${icoClass}">${icon}</div>
+      <div class="rep-info">
+        <div class="rep-name">${r.file_name || 'דוח בדק בית'}</div>
+        <div class="rep-meta"><span>${type}</span> · ${date}</div>
+      </div>
+      <div class="rep-arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+    </a>`;
+  }).join('');
+}
+async function openSavedReport(id) {
+  const { data, error } = await sb.from('reports').select('*').eq('id', id).single();
+  if (error || !data) { toast('שגיאה בטעינת הדוח'); return; }
+  sessionStorage.setItem('bdkl_report', JSON.stringify({ reportId: id, defects: data.data, fileName: data.file_name, propType: data.property_type }));
+  window.location.href = '/report.html';
+}
+function show(id) { document.querySelectorAll('.scr').forEach(s => s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
+function toast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('sh'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('sh'), 2500); }
+</script>
+</body>
+</html>
