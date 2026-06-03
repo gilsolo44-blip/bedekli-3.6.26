@@ -1105,6 +1105,29 @@ function buildCatchAllChunks(cleanPageMap, excludedPages, chunkSize = 5) {
   return result;
 }
 
+function _dedupKey(d) {
+  const norm = (d.title || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 40);
+  const h = crypto.createHash('md5').update(norm).digest('hex').slice(0, 8);
+  return `${d.area}|${d.pageNum}|${h}`;
+}
+
+// Merge text + vision defects. Dedup by the pipeline key; a colliding vision
+// defect enriches the kept record with its bbox if the kept record has none.
+function mergeDefects(textDefects, visionDefects) {
+  const byKey = new Map();
+  for (const d of textDefects) byKey.set(_dedupKey(d), d);
+  for (const v of (visionDefects || [])) {
+    const k = _dedupKey(v);
+    if (byKey.has(k)) {
+      const kept = byKey.get(k);
+      if (!kept.bbox && v.bbox) kept.bbox = v.bbox;
+    } else {
+      byKey.set(k, v);
+    }
+  }
+  return [...byKey.values()];
+}
+
 // ── Pipeline Orchestrator ────────────────────────────────────────────────────
 
 function pipeline(pdfText, propertyType, callback) {
@@ -1391,4 +1414,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects };

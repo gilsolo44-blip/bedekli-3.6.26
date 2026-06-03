@@ -50,5 +50,25 @@ t('step4_schema defaults bbox to null when absent', () => {
   assert.strictEqual(out[0].bbox, null);
 });
 
+t('mergeDefects appends unique vision defects', () => {
+  const text = [{ area:'סלון', pageNum:5, title:'סדק', bbox:null }];
+  const vis  = [{ area:'מטבח', pageNum:9, title:'רטיבות', bbox:[1,1,9,9] }];
+  const m = S.mergeDefects(text, vis);
+  assert.strictEqual(m.length, 2);
+});
+t('mergeDefects enriches matching text defect with bbox', () => {
+  const text = [{ area:'סלון', pageNum:5, title:'סדק בקיר', bbox:null }];
+  const vis  = [{ area:'סלון', pageNum:5, title:'סדק בקיר', bbox:[10,10,500,500] }];
+  const m = S.mergeDefects(text, vis);
+  assert.strictEqual(m.length, 1);
+  assert.deepStrictEqual(m[0].bbox, [10,10,500,500]);
+});
+t('mergeDefects keeps existing bbox over vision', () => {
+  const text = [{ area:'סלון', pageNum:5, title:'סדק', bbox:[1,1,2,2] }];
+  const vis  = [{ area:'סלון', pageNum:5, title:'סדק', bbox:[9,9,99,99] }];
+  const m = S.mergeDefects(text, vis);
+  assert.deepStrictEqual(m[0].bbox, [1,1,2,2]);
+});
+
 console.log(`\n${pass}/${pass+fail} PASS`);
 process.exit(fail ? 1 : 0);
