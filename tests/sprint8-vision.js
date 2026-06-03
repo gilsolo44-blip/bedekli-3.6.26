@@ -88,5 +88,18 @@ t('visionPath returns [] synchronously when no pdfBase64', () => {
   assert.deepStrictEqual(defsVal, []);
 });
 
+t('visionStructurePath returns null synchronously when no pdfBase64', () => {
+  let called=false, val='unset';
+  S.visionStructurePath(null, [{page:1,hasTextLayer:false}], 'txt', [], (m) => { called=true; val=m; });
+  assert.strictEqual(called, true);
+  assert.strictEqual(val, null);
+});
+t('visionStructurePath returns null synchronously when no visual pages', () => {
+  let called=false, val='unset';
+  S.visionStructurePath('abc', [{page:1,hasTextLayer:true,hasImages:false}], 'txt', [], (m) => { called=true; val=m; });
+  assert.strictEqual(called, true);
+  assert.strictEqual(val, null);
+});
+
 console.log(`\n${pass}/${pass+fail} PASS`);
 process.exit(fail ? 1 : 0);

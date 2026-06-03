@@ -876,6 +876,60 @@ function visionPath(pdfBase64, pageMeta, propertyType, log, callback) {
   });
 }
 
+// Vision-based STRUCTURE pass — used when text-based step1_llm fails on a
+// scanned PDF (sparse/empty text layer). Gemini reads the scanned pages and
+// returns a section map (room/area → page range), reusing parseStep1Json.
+const VISION_STRUCT_PROMPT = `אתה מנתח דוח בדק-בית סרוק (PDF). קרא את העמודים וזהה את מבנה המסמך — חלק אותו לסקשנים לפי חדר / אזור / מערכת.
+לכל סקשן החזר שם וטווח עמודים. כסה רק עמודים עם ממצאים.
+החזר JSON בלבד, ללא backticks:
+{"sections":[{"name":"שם החדר/אזור","startPage":מספר,"endPage":מספר}]}`;
+
+function geminiVisionStructure(fileUri, cleanText, callback, attempt = 1) {
+  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts: [
+      { fileData: { fileUri, mimeType: 'application/pdf' } },
+      { text: VISION_STRUCT_PROMPT },
+    ]}],
+    generationConfig: { temperature: 0, maxOutputTokens: 4096 },
+  });
+  postJSON({
+    hostname: 'generativelanguage.googleapis.com',
+    path: `/v1beta/models/${VISION.model}:generateContent?key=${GEMINI_KEY}`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+  }, body, (err, status, text) => {
+    if (err) return callback(err);
+    if (status === 429 && attempt === 1) return setTimeout(() => geminiVisionStructure(fileUri, cleanText, callback, 2), 8000);
+    if (status === 503 && attempt <= 2) return setTimeout(() => geminiVisionStructure(fileUri, cleanText, callback, attempt + 1), 4000 * attempt);
+    if (status !== 200) return callback(new Error('VisionStruct ' + status + ': ' + text.slice(0, 100)));
+    try {
+      const js = JSON.parse(text);
+      const out = js.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      callback(null, parseStep1Json(out, cleanText));
+    } catch (e) { callback(e); }
+  });
+}
+
+// Best-effort: returns a sectionMap or null (never errors). Own upload+cleanup.
+function visionStructurePath(pdfBase64, pageMeta, cleanText, log, callback) {
+  if (!VISION.enabled || !pdfBase64) return callback(null);
+  if (!detectVisualPages(pageMeta).length) return callback(null);
+  log.push('[VisionStruct] text-step1 failed — deriving structure from scanned pages');
+  geminiUploadFile(pdfBase64, (upErr, file) => {
+    if (upErr) { log.push('[VisionStruct] ✗ upload: ' + upErr.message); return callback(null); }
+    geminiVisionStructure(file.uri, cleanText, (exErr, sectionMap) => {
+      geminiDeleteFile(file.name, () => {});
+      if (exErr || !sectionMap || !sectionMap.sections || !sectionMap.sections.length) {
+        log.push('[VisionStruct] ✗ ' + (exErr ? exErr.message : 'no sections'));
+        return callback(null);
+      }
+      log.push(`[VisionStruct] ✓ ${sectionMap.sections.length} סקשנים`);
+      callback(sectionMap);
+    });
+  });
+}
+
 // ── Provider: OpenRouter ─────────────────────────────────────────────────────
 
 function openrouterCall(_, system, user, callback, attempt = 1) {
@@ -1330,14 +1384,29 @@ function pipeline(pdfText, propertyType, opts, callback) {
       Object.assign(byRoom, buildCatchAllChunks(cleanPageMap, coveredPages));
       if (unassigned.length > 0) fullLog.push(`[Step 1] -> catch-all: ${unassigned.length} עמודים לא משויכים`);
     } else {
-      // LLM failed — direct catch-all (format-agnostic, no Hebrew room assumption)
-      fullLog.push('[Step 1] -> LLM failed — catch-all all pages >= 5');
-      costTableText = Object.entries(costMap)
-        .filter(([, costs]) => costs.length >= 3)
-        .map(([p]) => cleanPageMap[p] ? `[עמוד ${p}]\n${cleanPageMap[p].trim()}` : '')
-        .filter(Boolean).join('\n\n');
-      byRoom = buildCatchAllChunks(cleanPageMap, new Set());
-      return runPipeline(byRoom);
+      // Text-step1 failed. For scanned PDFs, derive structure via vision before
+      // falling back to the generic page-chunk catch-all.
+      return visionStructurePath(pdfBase64, pageMeta, cleanText, fullLog, (visionMap) => {
+        if (visionMap && visionMap.sections && visionMap.sections.length) {
+          sectionMap = visionMap; // reuse success-path structureType + section handling
+          byRoom = step2b_byRoom(cleanText, sectionMap, []);
+          const coveredPages = new Set();
+          sectionMap.sections.forEach(({ startPage, endPage }) => {
+            for (let p = startPage; p <= endPage; p++) coveredPages.add(p);
+          });
+          Object.assign(byRoom, buildCatchAllChunks(cleanPageMap, coveredPages));
+          fullLog.push(`[Step 1] -> vision structure: ${sectionMap.sections.length} סקשנים`);
+          return runPipeline(byRoom);
+        }
+        // No vision structure available — original direct catch-all.
+        fullLog.push('[Step 1] -> LLM failed — catch-all all pages >= 5');
+        costTableText = Object.entries(costMap)
+          .filter(([, costs]) => costs.length >= 3)
+          .map(([p]) => cleanPageMap[p] ? `[עמוד ${p}]\n${cleanPageMap[p].trim()}` : '')
+          .filter(Boolean).join('\n\n');
+        byRoom = buildCatchAllChunks(cleanPageMap, new Set());
+        return runPipeline(byRoom);
+      });
     }
 
     runPipeline(byRoom);
@@ -1567,4 +1636,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath, visionStructurePath };
