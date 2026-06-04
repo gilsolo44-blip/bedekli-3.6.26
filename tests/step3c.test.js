@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { step3c_sectionBudget, SEV_WEIGHT } = require('../server');
+const { step3c_sectionBudget, SEV_WEIGHT, buildCatchAllChunks } = require('../server');
 
 // helpers
 const mkDefect = (overrides) => ({
@@ -73,4 +73,34 @@ test('Pass B runs when costTableText has sections, Pass C covers remainder', () 
   assert.equal(d0._cs, 'section', 'ריצוף defect should get _cs=section from Pass B');
   assert.equal(d1._cs, 'section', 'ריצוף defect should get _cs=section from Pass B');
   assert.equal(d2._cs, 'report',  'מסדרון defect not in table should get _cs=report from Pass C');
+});
+
+// ── buildCatchAllChunks: section header detection ─────────────────────────────
+
+test('buildCatchAllChunks: numbered header "1. עבודות ריצוף" → uses it as label', () => {
+  const map = { 5: '1. עבודות ריצוף\nנמצא סדק בין אריחים' };
+  const result = buildCatchAllChunks(map, new Set());
+  const labels = Object.keys(result);
+  assert.ok(labels.some(l => l.includes('עבודות ריצוף')), `expected work-type label, got: ${labels}`);
+});
+
+test('buildCatchAllChunks: unnumbered header "עבודות חשמל" → uses it as label', () => {
+  const map = { 6: 'עבודות חשמל\nשקע לא תקין בסלון' };
+  const result = buildCatchAllChunks(map, new Set());
+  const labels = Object.keys(result);
+  assert.ok(labels.some(l => l.includes('עבודות חשמל')), `expected work-type label, got: ${labels}`);
+});
+
+test('buildCatchAllChunks: Hebrew-letter prefix "א. עבודות נגרות" → uses it as label', () => {
+  const map = { 7: 'א. עבודות נגרות\nדלת כניסה לא נסגרת כראוי' };
+  const result = buildCatchAllChunks(map, new Set());
+  const labels = Object.keys(result);
+  assert.ok(labels.some(l => l.includes('עבודות נגרות')), `expected work-type label, got: ${labels}`);
+});
+
+test('buildCatchAllChunks: no recognizable header → falls back to ממצאים כלליים', () => {
+  const map = { 8: 'פגם כללי בקיר המזרחי\nצריך בדיקה נוספת' };
+  const result = buildCatchAllChunks(map, new Set());
+  const labels = Object.keys(result);
+  assert.ok(labels.some(l => l.includes('ממצאים כלליים')), `expected fallback label, got: ${labels}`);
 });

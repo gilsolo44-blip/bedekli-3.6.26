@@ -1467,7 +1467,7 @@ function buildCatchAllChunks(cleanPageMap, excludedPages, chunkSize = 5) {
         .join('\n\n');
       // Try to detect a section header — strip BiDi marks first
       const BIDI_RE = /[​-‏‪-‮⁦-⁩﻿]/g;
-      const SECTION_HEADER_RE = /(?:^|\n)\s*\.?\d+\.?\s*(עבודות\s+[א-ת"'\s,]{2,40}|[א-ת"'\s,]{4,40}(?:ריצוף|חשמל|אינסטל|רטיב|נגרות|מסגר|איטום|חיפוי|גבס|מרפסת|גג|שלד|צנרת|מיזוג))/m;
+      const SECTION_HEADER_RE = /(?:^|\n)\s*(?:\.?\d+\.?\s*|[א-ת]\.\s*)?(עבודות\s+[א-ת"'\s,]{2,40}|[א-ת"'\s,]{4,40}(?:ריצוף|חשמל|אינסטל|רטיב|נגרות|מסגר|איטום|חיפוי|גבס|מרפסת|גג|שלד|צנרת|מיזוג|צביעה|טיח|פיתוח))/m;
       let detectedLabel = null;
       for (const p of included) {
         const t = (cleanPageMap[p] || '').replace(BIDI_RE, '');
@@ -1864,4 +1864,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath, visionStructurePath, step3c_sectionBudget, SEV_WEIGHT };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath, visionStructurePath, step3c_sectionBudget, SEV_WEIGHT, buildCatchAllChunks };
