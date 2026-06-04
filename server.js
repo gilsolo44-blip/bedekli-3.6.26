@@ -1345,6 +1345,18 @@ function step0c_detectArchetype(cleanText) {
   return _archetypeDetector.detectArchetypeSync(cleanText, companyName);
 }
 
+function buildArchetypeBlock(rules) {
+  const parts = [];
+  if (rules.delimiter_pattern) parts.push(`[סימן גבול ליקוי: ${rules.delimiter_pattern}]`);
+  if (rules.extraction_hints && rules.extraction_hints.length)
+    parts.push(`[כללי חילוץ: ${rules.extraction_hints.join(' | ')}]`);
+  if (rules.cost_location) parts.push(`[מיקום מחיר: ${rules.cost_location}]`);
+  if (rules.few_shot && rules.few_shot.input) {
+    parts.push(`\nדוגמה:\n--- קלט ---\n${rules.few_shot.input}\n--- פלט ---\n${JSON.stringify(rules.few_shot.output)}\n---`);
+  }
+  return parts.join('\n');
+}
+
 function buildStep3Tasks(byRoom, costMap, archetype) {
   archetype = archetype || 'UNKNOWN';
   _ensureDetector();
@@ -1403,6 +1415,8 @@ function step3_extract(byRoom, costMap, callback, archetype) {
   const log = [];
   const allDefects = [];
   const tasks = buildStep3Tasks(byRoom, costMap, archetype);
+  const _arcRules = getArchetypeRules(archetype || 'UNKNOWN');
+  const _arcBlock = buildArchetypeBlock(_arcRules);
   let nextIdx = 0;
   let pending = 0;
   const results = new Array(tasks.length);
@@ -1415,7 +1429,7 @@ function step3_extract(byRoom, costMap, callback, archetype) {
       const t = tasks[i];
       const providers = t.isLarge ? PROVIDERS_LARGE : PROVIDERS_FAST;
       const chunkLabel = t.totalChunks > 1 ? ` (חלק ${t.chunkIdx + 1}/${t.totalChunks})` : '';
-      const userMsg = `חדר: ${t.room}${chunkLabel}${t.costHintLine}\n\nטקסט:\n${t.text}\n\nחלץ ליקויים. JSON בלבד.`;
+      const userMsg = `חדר: ${t.room}${chunkLabel}${t.costHintLine}${_arcBlock ? '\n' + _arcBlock : ''}\n\nטקסט:\n${t.text}\n\nחלץ ליקויים. JSON בלבד.`;
       const subLog = [];
       const delay = slotLaunch++ * MIN_STAGGER + Math.floor(Math.random() * 200);
 
@@ -1485,7 +1499,7 @@ function step3_extract(byRoom, costMap, callback, archetype) {
       const roomText = byRoom[room] || '';
       if (!roomText.trim()) return retryNext();
       const retryLog = [];
-      const userMsg = `חדר: ${room}\n\nטקסט:\n${roomText}\n\nחלץ ליקויים. JSON בלבד.`;
+      const userMsg = `חדר: ${room}${_arcBlock ? '\n' + _arcBlock : ''}\n\nטקסט:\n${roomText}\n\nחלץ ליקויים. JSON בלבד.`;
       tryProviders(SHORT_PROMPT, userMsg, retryLog, (err, raw) => {
         retryLog.forEach(l => log.push(`  [retry:${room}] ${l}`));
         if (!err && raw) {
