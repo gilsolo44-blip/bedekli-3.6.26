@@ -149,7 +149,7 @@ const STRUCT_PROMPT = `אתה מנתח מסמך בדק-בית. משימתך: ל�
 2. מינימום sections לפי גודל הדוח:
    ≤15 עמ' → לפחות 2  |  16-40 עמ' → לפחות 4
    41-80 עמ' → לפחות 7  |  81-150 עמ' → לפחות 10  |  151+ עמ' → לפחות 14
-3. "ממצאים כלליים" — מותר רק אם אין שם ספציפי. מוגבל ל-3 עמ' מקסימום.
+3. "ממצאים כלליים" — מותר רק כ-section אחרון קצר (עד 3 עמ'). **אסור** להשתמש בו כ-section יחיד או עיקרי.
 4. כסה כל עמוד מהעמוד הראשון עם ממצאים ועד הסוף. sections רצופות ללא חפיפה.
 5. costTablePages = עמודים עם ריבוי סכומי כסף בלבד (ללא ממצאים הנדסיים).
 6. reportTotal = הסכום הכולל שמופיע בדוח (0 אם לא נמצא).
@@ -162,8 +162,11 @@ const STRUCT_PROMPT = `אתה מנתח מסמך בדק-בית. משימתך: ל�
 דוגמה ב׳ — בית 40 עמ', לפי מערכות:
 {"sections":[{"name":"ריצוף","startPage":4,"endPage":14},{"name":"חשמל","startPage":15,"endPage":24},{"name":"אינסטלציה","startPage":25,"endPage":38}],"costTablePages":[39,40],"reportTotal":85000}
 
-דוגמה ג׳ — דוח קצר 12 עמ':
-{"sections":[{"name":"ממצאים כלליים","startPage":2,"endPage":12}],"costTablePages":[],"reportTotal":0}`;
+דוגמה ג׳ — בניין מסחרי 15 עמ', לפי קומות:
+{"sections":[{"name":"קומת קרקע","startPage":2,"endPage":5},{"name":"קומה ראשונה","startPage":6,"endPage":10},{"name":"גג ותשתיות","startPage":11,"endPage":15}],"costTablePages":[],"reportTotal":42000}
+
+דוגמה ד׳ — דירה 51 עמ', פרקים ממוספרים (.1 עבודות X, .2 עבודות Y):
+{"sections":[{"name":"עבודות שלד ובניה","startPage":5,"endPage":11},{"name":"עבודות נגרות","startPage":12,"endPage":18},{"name":"עבודות מסגרות","startPage":19,"endPage":27},{"name":"עבודות חיפוי קרמיקה","startPage":28,"endPage":35},{"name":"עבודות חשמל","startPage":36,"endPage":42},{"name":"עבודות שליכט וצבע","startPage":43,"endPage":47},{"name":"עבודות ריצוף","startPage":48,"endPage":51}],"costTablePages":[],"reportTotal":0}`;
 
 const OUTLINE_MAX = 5000; // chars — keeps step1 prompt below Groq's 6144-token output window
 
@@ -184,7 +187,27 @@ function makeStructureOutline(cleanText) {
 
 function parseStep1Json(raw, cleanText) {
   const cleaned = raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-  const js = JSON.parse(cleaned);
+  let js;
+  try {
+    js = JSON.parse(cleaned);
+  } catch {
+    // Try extracting JSON object from anywhere in the response
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try {
+      js = JSON.parse(m[0]);
+    } catch {
+      // Try to recover truncated JSON — close open arrays/objects
+      let partial = m[0];
+      const opens = (partial.match(/\[/g)||[]).length - (partial.match(/\]/g)||[]).length;
+      const opens2 = (partial.match(/\{/g)||[]).length - (partial.match(/\}/g)||[]).length;
+      // Remove trailing incomplete object (last unclosed {)
+      const lastGoodBrace = partial.lastIndexOf('},');
+      if (lastGoodBrace > 0) partial = partial.slice(0, lastGoodBrace + 1);
+      partial += ']}'.repeat(Math.max(0, opens)) + '}'.repeat(Math.max(0, opens2 - opens));
+      try { js = JSON.parse(partial); } catch { return null; }
+    }
+  }
   if (!js.sections || !Array.isArray(js.sections) || js.sections.length === 0) return null;
   const totalPages = Math.max(...(cleanText.match(/---\s*עמוד\s*(\d+)\s*---/g) || ['---עמוד 999---'])
     .map(m => parseInt(m.match(/\d+/)[0])));
@@ -197,6 +220,10 @@ function parseStep1Json(raw, cleanText) {
 
 function step1_llm(cleanText, log, callback) {
   const totalPages = (cleanText.match(/---\s*עמוד\s*(\d+)\s*---/g) || []).length;
+  if (totalPages === 0) {
+    log.push('  [step1] no page markers in text (scanned PDF?) — skip LLM → vision fallback');
+    return callback(null);
+  }
   const cacheKey = `step1_${pdfHash(cleanText)}`;
   const cached = cacheGet(cacheKey);
   if (cached) {
@@ -361,20 +388,20 @@ function step3c_sectionBudget(defects, costTableText, reportTotal) {
   const result = defects.map(d => ({ ...d }));
 
   // Pass A: inline cost extraction from defect quote / description
-  const inlineRe = /(?:₪|ש['”״””]ח)\s*([\d,]+)|עלות[^:\n]{0,20}:\s*([\d,]+)/i; // m[1]: ₪ 1,000 | m[2]: עלות: 1000
+  const inlineRe = /(?:₪|ש['”״””]ח)\s*([\d,]+)|([\d,]+)\s*(?:₪|ש['”״””]ח)|עלות[^:\n]{0,20}:\s*([\d,]+)/i;
   result.forEach(d => {
     if (parseInt((d.c || '').toString().replace(/[^\d]/g, '')) >= 200) return;
     const text = (d.q || '') + ' ' + (d.ds || '');
     const m = inlineRe.exec(text);
     if (!m) return;
-    const amount = parseInt((m[1] || m[2] || '').replace(/,/g, ''));
+    const amount = parseInt((m[1] || m[2] || m[3] || '').replace(/,/g, ''));
     if (amount >= 200 && (!reportTotal || amount <= reportTotal)) { d.c = amount; d._cs = 'report'; }
   });
 
   // Pass B: section-budget distribution for remainder
   if (!reportTotal || reportTotal <= 0 || !costTableText || !costTableText.trim()) return result;
 
-  const secRe = /([^\n\d:–\-]{2,25})\s*[:–\-]\s*(\d{1,3}(?:,\d{3})+|\d{4,7})\s*(?:ש['”״””]ח|₪)?/gi;
+  const secRe = /([^\n\d:–\-|.]{2,35})\s*(?:[:–\-|]|\.{2,})\s*(\d{1,3}(?:,\d{3})+|\d{4,7})\s*(?:ש['”״””]ח|₪)?/gi;
   const sections = {};
   for (const m of costTableText.matchAll(secRe)) {
     const name = m[1].trim().replace(/\s+/g, ' ');
@@ -850,6 +877,82 @@ function geminiVisionExtract(fileUri, visualPages, propertyType, callback, attem
   });
 }
 
+// Per-section vision extraction prompt — includes section name for room attribution
+const SCAN_SECTION_PROMPT = `אתה מנתח דוח בדק-בית סרוק. חלץ את כל הליקויים מהעמודים: {PAGES}.
+שם החדר/האזור הנוכחי: "{ROOM}". השתמש בשם זה בשדה area לכל הליקויים.
+לכל ליקוי: אם יש צילום רלוונטי — החזר bbox [ymin,xmin,ymax,xmax] בקואורדינטות 0-1000; אחרת bbox=null.
+החזר JSON בלבד, ללא backticks:
+{"defects":[{"t":"כותרת קצרה","ds":"תיאור מלא","s":"critical|high|medium|low|cosmetic","p":מספר_עמוד,"c":"עלות אם מופיעה","rec":"פעולה נדרשת","area":"{ROOM}","bbox":[...] or null}]}`;
+
+// Extract defects from a single section of a scanned PDF (reuses uploaded fileUri).
+function geminiVisionExtractSection(fileUri, sectionName, pages, callback, attempt = 1) {
+  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+  const prompt = SCAN_SECTION_PROMPT
+    .replace(/{PAGES}/g, pages.join(', '))
+    .replace(/{ROOM}/g, sectionName);
+  const body = JSON.stringify({
+    contents: [{ role: 'user', parts: [
+      { fileData: { fileUri, mimeType: 'application/pdf' } },
+      { text: prompt },
+    ]}],
+    generationConfig: { temperature: 0, maxOutputTokens: 16384 },
+  });
+  postJSON({
+    hostname: 'generativelanguage.googleapis.com',
+    path: `/v1beta/models/${VISION.model}:generateContent?key=${GEMINI_KEY}`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+  }, body, (err, status, text) => {
+    if (err) return callback(err);
+    if ((status === 429 || status === 503) && attempt <= 2) {
+      return setTimeout(() => geminiVisionExtractSection(fileUri, sectionName, pages, callback, attempt + 1), 8000 * attempt);
+    }
+    if (status !== 200) return callback(new Error('ScanSection ' + status + ': ' + text.slice(0, 120)));
+    try {
+      const js = JSON.parse(text);
+      const out = js.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      callback(null, parseDefects(out).map(d => ({ ...d, area: sectionName })));
+    } catch (e) { callback(e); }
+  });
+}
+
+// Full-document scan for scanned PDFs: upload once, extract per section in parallel.
+// Best-effort — never errors, always returns array (possibly empty).
+function scanExtractPerSection(pdfBase64, sections, log, callback) {
+  if (!VISION.enabled || !pdfBase64 || !sections.length) return callback([]);
+  log.push(`[ScanExtract] uploading PDF for per-section extraction (${sections.length} sections)...`);
+  geminiUploadFile(pdfBase64, (upErr, file) => {
+    if (upErr) { log.push('[ScanExtract] ✗ upload: ' + upErr.message); return callback([]); }
+    log.push('[ScanExtract] upload ok');
+    const allDefects = [];
+    let nextIdx = 0, pending = 0, finished = false;
+    const SCAN_CONC = 2;
+    function finish() {
+      if (finished) return; finished = true;
+      geminiDeleteFile(file.name, () => {});
+      log.push(`[ScanExtract] ✓ ${allDefects.length} ליקויים מ-${sections.length} סקשנים`);
+      callback(allDefects);
+    }
+    function runNext() {
+      while (pending < SCAN_CONC && nextIdx < sections.length) {
+        const sec = sections[nextIdx++];
+        const pages = [];
+        for (let p = sec.startPage; p <= sec.endPage; p++) pages.push(p);
+        pending++;
+        geminiVisionExtractSection(file.uri, sec.name, pages, (err, defs) => {
+          pending--;
+          if (err) log.push(`[ScanExtract] ✗ ${sec.name}: ${err.message}`);
+          else { log.push(`[ScanExtract] ${sec.name}: ${(defs||[]).length} ליקויים`); allDefects.push(...(defs||[])); }
+          if (nextIdx < sections.length) runNext();
+          else if (pending === 0) finish();
+        });
+      }
+      if (nextIdx >= sections.length && pending === 0) finish();
+    }
+    runNext();
+  });
+}
+
 // Parallel vision path. Best-effort: NEVER calls callback(err) — always (null, defects).
 function visionPath(pdfBase64, pageMeta, propertyType, log, callback) {
   if (!VISION.enabled || !pdfBase64) { log.push('[Vision] disabled or no PDF — skipped'); return callback(null, []); }
@@ -891,7 +994,7 @@ function geminiVisionStructure(fileUri, cleanText, callback, attempt = 1) {
       { fileData: { fileUri, mimeType: 'application/pdf' } },
       { text: VISION_STRUCT_PROMPT },
     ]}],
-    generationConfig: { temperature: 0, maxOutputTokens: 4096 },
+    generationConfig: { temperature: 0, maxOutputTokens: 8192 },
   });
   postJSON({
     hostname: 'generativelanguage.googleapis.com',
@@ -969,22 +1072,22 @@ const providerInFlight  = {}; // { providerName: count } — prevents race-condi
 
 // ── Provider Cascade ─────────────────────────────────────────────────────────
 
-// FAST: חדרים רגילים — מהירות + עברית
+// FAST: חדרים רגילים — Groq אם קיים, אחרת Gemini
 const PROVIDERS_FAST = [
   { name: 'groq-70b',          check: () => GROQ_KEYS.length > 0 && GROQ_KEYS.length > groqKeyExhausted.size, call: groqCall,       model: 'llama-3.3-70b-versatile' },
-  { name: 'gemini-flash-lite', check: () => !!GEMINI_KEY,                                                     call: geminiCall,     model: 'gemini-2.5-flash-lite' },
   { name: 'gemini-flash',      check: () => !!GEMINI_KEY,                                                     call: geminiCall,     model: 'gemini-2.5-flash' },
+  { name: 'gemini-flash-lite', check: () => !!GEMINI_KEY,                                                     call: geminiCall,     model: 'gemini-2.5-flash-lite' },
   { name: 'openrouter-llm',    check: () => !!OPENROUTER_KEY,                                                 call: openrouterCall, model: 'meta-llama/llama-3.3-70b-instruct:free' },
-  { name: 'cerebras-qwen',      check: () => !!CEREBRAS_KEY,                                                   call: cerebrasCall,   model: 'qwen-3-235b-a22b-instruct-2507' },
+  { name: 'cerebras-qwen',     check: () => !!CEREBRAS_KEY,                                                   call: cerebrasCall,   model: 'qwen-3-235b-a22b-instruct-2507' },
 ];
 
 // LARGE: catch-all ועמודים ארוכים — context גדול + output 65K
 const PROVIDERS_LARGE = [
   { name: 'groq-70b',          check: () => GROQ_KEYS.length > 0 && GROQ_KEYS.length > groqKeyExhausted.size, call: groqCall,       model: 'llama-3.3-70b-versatile' },
-  { name: 'gemini-flash-lite', check: () => !!GEMINI_KEY,                                                     call: geminiCall,     model: 'gemini-2.5-flash-lite' },
   { name: 'gemini-flash',      check: () => !!GEMINI_KEY,                                                     call: geminiCall,     model: 'gemini-2.5-flash' },
+  { name: 'gemini-flash-lite', check: () => !!GEMINI_KEY,                                                     call: geminiCall,     model: 'gemini-2.5-flash-lite' },
   { name: 'openrouter-llm',    check: () => !!OPENROUTER_KEY,                                                 call: openrouterCall, model: 'meta-llama/llama-3.3-70b-instruct:free' },
-  { name: 'cerebras-qwen',      check: () => !!CEREBRAS_KEY,                                                   call: cerebrasCall,   model: 'qwen-3-235b-a22b-instruct-2507' },
+  { name: 'cerebras-qwen',     check: () => !!CEREBRAS_KEY,                                                   call: cerebrasCall,   model: 'qwen-3-235b-a22b-instruct-2507' },
 ];
 
 // STRUCT: step1_llm only — Gemini-first for superior JSON section detection
@@ -1277,9 +1380,20 @@ function buildCatchAllChunks(cleanPageMap, excludedPages, chunkSize = 5) {
       const texts = included
         .map(p => `[עמוד ${p}]\n${(cleanPageMap[p] || '').trim()}`)
         .join('\n\n');
-      const label = included.length > 1
-        ? `ממצאים כלליים (עמ' ${included[0]}-${included[included.length - 1]})`
-        : `ממצאים כלליים (עמ' ${included[0]})`;
+      // Try to detect a section header — strip BiDi marks first
+      const BIDI_RE = /[​-‏‪-‮⁦-⁩﻿]/g;
+      const SECTION_HEADER_RE = /(?:^|\n)\s*\.?\d+\.?\s*(עבודות\s+[א-ת"'\s,]{2,40}|[א-ת"'\s,]{4,40}(?:ריצוף|חשמל|אינסטל|רטיב|נגרות|מסגר|איטום|חיפוי|גבס|מרפסת|גג|שלד|צנרת|מיזוג))/m;
+      let detectedLabel = null;
+      for (const p of included) {
+        const t = (cleanPageMap[p] || '').replace(BIDI_RE, '');
+        const m = t.match(SECTION_HEADER_RE);
+        if (m) { detectedLabel = m[1].trim().replace(/\s+/g,' ').slice(0, 50); break; }
+      }
+      const label = detectedLabel
+        ? detectedLabel
+        : (included.length > 1
+          ? `ממצאים כלליים (עמ' ${included[0]}-${included[included.length - 1]})`
+          : `ממצאים כלליים (עמ' ${included[0]})`);
       result[label] = texts;
     }
   }
@@ -1373,6 +1487,21 @@ function pipeline(pdfText, propertyType, opts, callback) {
         .join('\n\n');
       fullLog.push(`[Step 1] -> LLM זיהה ${sectionMap.sections.length} סקשנים, ${costTablePages.length} עמודי עלויות`);
 
+      // Auto-supplement: if LLM found no cost table pages, fall back to step0 high-density pages
+      if (!costTableText.trim()) {
+        const sectionPageSet = new Set();
+        sectionMap.sections.forEach(({ startPage, endPage }) => {
+          for (let p = startPage; p <= endPage; p++) sectionPageSet.add(p);
+        });
+        const autoPages = Object.entries(costMap)
+          .filter(([p, costs]) => costs.length >= 3 && !sectionPageSet.has(Number(p)) && cleanPageMap[Number(p)])
+          .map(([p]) => `[עמוד ${p}]\n${cleanPageMap[Number(p)].trim()}`);
+        if (autoPages.length) {
+          costTableText = autoPages.join('\n\n');
+          fullLog.push(`[Step 0] -> auto-detected ${autoPages.length} עמודי עלויות מ-regex`);
+        }
+      }
+
       // Catch-all: pages not covered by any section (LLM may leave gaps)
       const coveredPages = new Set();
       sectionMap.sections.forEach(({ startPage, endPage }) => {
@@ -1388,14 +1517,24 @@ function pipeline(pdfText, propertyType, opts, callback) {
       // falling back to the generic page-chunk catch-all.
       return visionStructurePath(pdfBase64, pageMeta, cleanText, fullLog, (visionMap) => {
         if (visionMap && visionMap.sections && visionMap.sections.length) {
-          sectionMap = visionMap; // reuse success-path structureType + section handling
+          sectionMap = visionMap;
+          fullLog.push(`[Step 1] -> vision structure: ${sectionMap.sections.length} סקשנים`);
+          // Scanned PDF: text is empty — run per-section vision extraction for defects
+          if (!cleanText.trim()) {
+            return scanExtractPerSection(pdfBase64, sectionMap.sections, fullLog, (scanDefects) => {
+              // Inject scan results as vision defects so _afterVision picks them up
+              _visionDefects = step4_schema(scanDefects);
+              _visionDone = true;
+              // Run pipeline with empty byRoom; step3→0 defects; _afterVision fires with scan results
+              return runPipeline({});
+            });
+          }
           byRoom = step2b_byRoom(cleanText, sectionMap, []);
           const coveredPages = new Set();
           sectionMap.sections.forEach(({ startPage, endPage }) => {
             for (let p = startPage; p <= endPage; p++) coveredPages.add(p);
           });
           Object.assign(byRoom, buildCatchAllChunks(cleanPageMap, coveredPages));
-          fullLog.push(`[Step 1] -> vision structure: ${sectionMap.sections.length} סקשנים`);
           return runPipeline(byRoom);
         }
         // No vision structure available — original direct catch-all.
@@ -1414,7 +1553,7 @@ function pipeline(pdfText, propertyType, opts, callback) {
     function runPipeline(bR) {
     // Detect structureType: rooms / floors / systems / chapters
     const FLOOR_RE   = /קומ[הות]|קומת?\s*קרקע|מרתף/;
-    const SYSTEMS_RE = /חשמל|אינסטלציה|תברואה|ריצוף|איטום|צנרת|מערכת/;
+    const SYSTEMS_RE = /עבודות|חשמל|אינסטלציה|תברואה|ריצוף|איטום|צנרת|מערכת|נגרות|מסגרות|חיפוי|שליכט|רטיבות|שלד/;
     const roomNames  = ['סלון','מטבח','חדר שינה','חדר ילדים','חדר רחצה','אמבטיה','שירותים','מרפסת','פרוזדור','כניסה','מחסן','חניה','לובי','ממ"ד','מרחב מוגן'];
     const allSections = sectionMap ? sectionMap.sections.map(s => s.name) : Object.keys(bR);
     const floorCount   = allSections.filter(n => FLOOR_RE.test(n)).length;
@@ -1422,7 +1561,7 @@ function pipeline(pdfText, propertyType, opts, callback) {
     const matchingCount = allSections.filter(name => roomNames.some(r => name.includes(r))).length;
     let structureType;
     if (allSections.length > 0 && (floorCount / allSections.length) >= 0.4)        structureType = 'floors';
-    else if (allSections.length > 0 && (systemsCount / allSections.length) >= 0.5) structureType = 'systems';
+    else if (allSections.length > 0 && (systemsCount / allSections.length) >= 0.4) structureType = 'systems';
     else if (allSections.length > 0 && (matchingCount / allSections.length) >= 0.5) structureType = 'rooms';
     else structureType = 'chapters';
     fullLog.push(`[Structure] type=${structureType} (floors=${floorCount} systems=${systemsCount} rooms=${matchingCount}/${allSections.length})`);
@@ -1537,7 +1676,7 @@ http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const { pdfText, propertyType, pdfBase64, pageMeta } = JSON.parse(Buffer.concat(body).toString('utf8'));
-        if (!pdfText) { res.writeHead(400,{'Content-Type':'application/json'}); return res.end(JSON.stringify({error:'Missing PDF text'})); }
+        if (!pdfText && !pdfBase64) { res.writeHead(400,{'Content-Type':'application/json'}); return res.end(JSON.stringify({error:'Missing PDF text or base64'})); }
         if (pdfText.length > 2000000) {
           res.writeHead(413, {'Content-Type': 'application/json'});
           return res.end(JSON.stringify({ error: 'הדוח גדול מדי — נסה PDF של עד 800 עמודים' }));
