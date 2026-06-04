@@ -708,6 +708,7 @@ function step4_schema(rawDefects) {
       standardRef:     d.std  || '',
       archetypeSource: d._arch || '',
       bbox:          validateBbox(d.bbox),
+      simplified_explanation: d.simplified_explanation || '',
     };
   });
 }
