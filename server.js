@@ -596,7 +596,7 @@ function step4_schema(rawDefects) {
       area,
       title,
       desc,
-      action: d.rec || desc,
+      action: (d.rec && d.rec.trim() !== desc.trim()) ? d.rec : '',
       sev,
       pageNum,
       page: `עמוד ${pageNum}`,
@@ -607,6 +607,8 @@ function step4_schema(rawDefects) {
       category:      catObj.code,
       categoryLabel: catObj.label,
       workType:      inferWorkType(d.rec || desc),
+      standardRef:     d.std  || '',
+      archetypeSource: d._arch || '',
       bbox:          validateBbox(d.bbox),
     };
   });
