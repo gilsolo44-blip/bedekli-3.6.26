@@ -154,3 +154,20 @@ test('Bug #3: action kept when different from desc', () => {
   const action = rec && rec.trim() !== desc.trim() ? rec : '';
   assert.equal(action, 'להחליף את האריח השבור.');
 });
+
+// ── extractCompanyName — RTL flip fix ─────────────────────────────────────────
+
+test('finds company when pdfminer flips RTL string', () => {
+  // pdfminer reverses "גולדאל הנדסה" → "הסדנה לאדלוג"
+  const flippedText = 'Inspection and Engineering Services\n  הסדנה לאדלוג \n-058\n7517771';
+  const profiles = { 'גולדאל הנדסה': { archetype: 'HIERARCHICAL' } };
+  const name = extractCompanyName(flippedText, profiles);
+  assert.equal(name, 'גולדאל הנדסה');
+});
+
+test('still finds company in normal (non-flipped) text', () => {
+  const normalText = 'גולדאל הנדסה בע"מ\nדוח בדיקה';
+  const profiles = { 'גולדאל הנדסה': { archetype: 'HIERARCHICAL' } };
+  const name = extractCompanyName(normalText, profiles);
+  assert.equal(name, 'גולדאל הנדסה');
+});
