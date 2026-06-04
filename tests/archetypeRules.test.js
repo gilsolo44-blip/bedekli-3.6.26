@@ -14,6 +14,7 @@ test('returns HIERARCHICAL rules with expected keys', () => {
   assert.ok(rules.extraction_hints, 'should have extraction_hints');
   assert.ok(Array.isArray(rules.extraction_hints), 'extraction_hints should be array');
   assert.ok(rules.extraction_hints.length > 0, 'extraction_hints should have items');
+  assert.ok(rules.few_shot, 'should have few_shot');
 });
 
 // ── Test: fallback to UNKNOWN ────────────────────────────────────────────────
