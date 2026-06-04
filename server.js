@@ -482,7 +482,7 @@ function step3c_sectionBudget(defects, costTableText, reportTotal) {
   if (reportTotal > 0) {
     const noCost = result
       .map((d, i) => ({ i, d }))
-      .filter(({ d }) => !d._cs && parseInt((d.c || '').toString().replace(/[^\d]/g, '')) < 200);
+      .filter(({ d }) => !d._cs && !(parseInt((d.c || '').toString().replace(/[^\d]/g, '')) >= 200));
     if (noCost.length > 0) {
       const allocatedSum = result.filter(d => d._cs).reduce((s, d) => s + (d.c || 0), 0);
       const budget = allocatedSum < reportTotal ? (reportTotal - allocatedSum) : reportTotal;
@@ -1864,4 +1864,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath, visionStructurePath };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath, visionStructurePath, step3c_sectionBudget, SEV_WEIGHT };
