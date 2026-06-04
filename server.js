@@ -104,17 +104,19 @@ console.log(`[AUTH_LOCKED] Provider keys verified — GROQ:${GROQ_KEYS.length} C
 // ── Step 0: Cost Pre-extraction (JavaScript only) ────────────────────────────
 
 function step0_extractCosts(pdfText) {
+  const BIDI_RE = /[‎‏‪-‮⁦-⁩]/g;
   const pages = pdfText.split(/---\s*עמוד\s*(\d+)\s*---/);
   const costMap = {};
-  const moneyRe = /(\d{1,3}(?:,\d{3})+|\d{4,7})\s*(?:ש["״]ח|₪|שקלים?)\b/g;
+  // Match both "1,500 ₪" and "₪ 1,500" (Israeli reports use both)
+  const moneyRe = /(\d{1,3}(?:,\d{3})+|\d{4,7})\s*(?:ש["״]ח|₪|שקלים?)\b|(?:₪|ש["״]ח)\s*(\d{1,3}(?:,\d{3})+|\d{4,7})/g;
   for (let i = 1; i < pages.length; i += 2) {
     const pageNum = parseInt(pages[i]);
-    const text = pages[i + 1] || '';
+    const text = (pages[i + 1] || '').replace(BIDI_RE, '');
     const costs = [];
     let m;
     moneyRe.lastIndex = 0;
     while ((m = moneyRe.exec(text)) !== null) {
-      const val = parseInt(m[1].replace(/,/g, ''));
+      const val = parseInt((m[1] || m[2] || '').replace(/,/g, ''));
       if (val >= 200 && val <= 500000) costs.push(val);
     }
     if (costs.length) costMap[pageNum] = costs;
@@ -123,22 +125,38 @@ function step0_extractCosts(pdfText) {
 }
 
 function step0b_extractReportTotal(pdfText) {
-  const TOTAL_KW = '(?:סה["״“”]?כ|סהכ|סך\\s+הכל|עלות\\s+כוללת|סכום\\s+כולל|סיכום\\s+כספי|עלות\\s+מוערכת\\s+כוללת)';
+  const BIDI_RE = /[‎‏‪-‮⁦-⁩]/g;
+  const clean = pdfText.replace(BIDI_RE, '');
+  const TOTAL_KW = '(?:סה[“״””]?כ|סהכ|סך\\s+הכל|עלות\\s+כוללת|סכום\\s+כולל|סיכום\\s+כספי|עלות\\s+מוערכת\\s+כוללת)';
   const NUM     = '(\\d{1,3}(?:,\\d{3})+|\\d{4,7})';
-  const SHK     = '(?:\\s*(?:ש[\'"\\u05f4“”]ח|₪|שקלים?))?';
+  const SHK     = '(?:\\s*(?:ש[\'”\\u05f4””]ח|₪|שקלים?))?';
 
-  // Pass 1 — keyword + optional shekel (wide quote variants)
-  const re1 = new RegExp(TOTAL_KW + '[^\\d]{0,40}' + NUM + SHK, 'gi');
   let best = 0;
-  for (const m of pdfText.matchAll(re1)) {
+
+  // Pass 1a — keyword THEN number (e.g. “סה”כ עלויות: 227,500 ₪”)
+  const re1a = new RegExp(TOTAL_KW + '[^\\d]{0,40}' + NUM + SHK, 'gi');
+  for (const m of clean.matchAll(re1a)) {
     const val = parseInt(m[1].replace(/,/g, ''));
     if (val >= 1000 && val <= 5000000 && val > best) best = val;
   }
+
+  // Pass 1b — number THEN keyword (e.g. “כ₪ 227,500 - סה”כ עלויות”)
+  const re1b = new RegExp('(?:כ)?\\s*(?:₪|ש[\'”\\u05f4””]ח)\\s*' + NUM + '[^\\n]{0,60}' + TOTAL_KW, 'gi');
+  for (const m of clean.matchAll(re1b)) {
+    const val = parseInt(m[1].replace(/,/g, ''));
+    if (val >= 1000 && val <= 5000000 && val > best) best = val;
+  }
+
   if (best > 0) return best;
 
-  // Pass 2 — MAX of any shekel amount ≥ 10,000 (last-resort for atypical formats)
-  const re2 = new RegExp(NUM + '\\s*(?:ש[\'"\\u05f4“”]ח|₪|שקלים)', 'gi');
-  for (const m of pdfText.matchAll(re2)) {
+  // Pass 2 — MAX of any shekel amount ≥ 10,000, both directions
+  const re2a = new RegExp(NUM + '\\s*(?:ש[\'”\\u05f4””]ח|₪|שקלים)', 'gi');
+  const re2b = new RegExp('(?:₪|ש[\'”\\u05f4””]ח)\\s*' + NUM, 'gi');
+  for (const m of clean.matchAll(re2a)) {
+    const val = parseInt(m[1].replace(/,/g, ''));
+    if (val >= 10000 && val <= 5000000 && val > best) best = val;
+  }
+  for (const m of clean.matchAll(re2b)) {
     const val = parseInt(m[1].replace(/,/g, ''));
     if (val >= 10000 && val <= 5000000 && val > best) best = val;
   }
@@ -180,16 +198,32 @@ const STRUCT_PROMPT = `אתה מנתח מסמך בדק-בית. משימתך: ל�
 const OUTLINE_MAX = 5000; // chars — keeps step1 prompt below Groq's 6144-token output window
 
 function makeStructureOutline(cleanText) {
+  const BIDI_RE = /[‎‏‪-‮⁦-⁩]/g;
   const parts = cleanText.split(/---\s*עמוד\s*(\d+)\s*---/);
   const totalPages = Math.floor((parts.length - 1) / 2);
-  // Scale lines-per-page so all pages fit: assume ~60 chars per compressed line
-  const linesPerPage = Math.min(8, Math.max(1, Math.floor(OUTLINE_MAX / (Math.max(totalPages, 1) * 60))));
+
+  // Collect cleaned lines per page
+  const pageLines = {};
+  const lineFreq = {};
+  for (let i = 1; i < parts.length; i += 2) {
+    const pn = parseInt(parts[i]);
+    const cleaned = (parts[i + 1] || '').replace(BIDI_RE, '').trim();
+    const ls = cleaned.split('\n').map(l => l.trim()).filter(l => l.length > 3);
+    pageLines[pn] = ls;
+    ls.slice(0, 4).forEach(l => { const k = l.slice(0, 60); lineFreq[k] = (lineFreq[k] || 0) + 1; });
+  }
+
+  // Lines appearing on >60% of pages are repeated headers — skip them
+  const threshold = Math.max(3, Math.floor(totalPages * 0.6));
+  const commonLines = new Set(Object.entries(lineFreq).filter(([, f]) => f >= threshold).map(([k]) => k));
+
+  const linesPerPage = Math.min(8, Math.max(2, Math.floor(OUTLINE_MAX / (Math.max(totalPages, 1) * 60))));
   const lines = [];
   for (let i = 1; i < parts.length; i += 2) {
     const pageNum = parts[i];
-    const content = (parts[i + 1] || '').trim();
-    const firstLines = content.split('\n').map(l => l.trim()).filter(l => l.length > 2).slice(0, linesPerPage).join(' | ');
-    if (firstLines) lines.push(`עמוד ${pageNum}: ${firstLines}`);
+    const all = pageLines[parseInt(pageNum)] || [];
+    const meaningful = all.filter(l => !commonLines.has(l.slice(0, 60))).slice(0, linesPerPage);
+    if (meaningful.length > 0) lines.push(`עמוד ${pageNum}: ${meaningful.join(' | ')}`);
   }
   return lines.join('\n').slice(0, OUTLINE_MAX);
 }
