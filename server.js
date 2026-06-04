@@ -452,12 +452,10 @@ function step3c_sectionBudget(defects, costTableText, reportTotal) {
   for (const m of costTableText.matchAll(secRe)) {
     const name = m[1].trim().replace(/\s+/g, ' ');
     const amount = parseInt(m[2].replace(/,/g, ''));
-    if (amount >= 1000 && amount <= reportTotal && name.length >= 2) {
+    if (amount >= 1000 && amount <= reportTotal * 0.95 && name.length >= 2) {
       sections[name] = Math.max(sections[name] || 0, amount);
     }
   }
-  if (Object.keys(sections).length === 0) return result;
-
   const byArea = {};
   result.forEach((d, i) => {
     if (parseInt((d.c || '').toString().replace(/[^\d]/g, '')) >= 200) return;
@@ -478,6 +476,23 @@ function step3c_sectionBudget(defects, costTableText, reportTotal) {
       result[i].c = Math.max(200, Math.round((w / totalWeight) * budget));
       result[i]._cs = 'section';
     });
+  }
+
+  // Pass C: distribute reportTotal to any defects still without a cost source
+  if (reportTotal > 0) {
+    const noCost = result
+      .map((d, i) => ({ i, d }))
+      .filter(({ d }) => !d._cs && parseInt((d.c || '').toString().replace(/[^\d]/g, '')) < 200);
+    if (noCost.length > 0) {
+      const allocatedSum = result.filter(d => d._cs).reduce((s, d) => s + (d.c || 0), 0);
+      const budget = allocatedSum < reportTotal ? (reportTotal - allocatedSum) : reportTotal;
+      const totalWeight = noCost.reduce((s, { d }) => s + (SEV_WEIGHT[d.s] || 1), 0);
+      noCost.forEach(({ i, d }) => {
+        const w = SEV_WEIGHT[d.s] || 1;
+        result[i].c = Math.max(200, Math.round((w / totalWeight) * budget));
+        result[i]._cs = 'report';
+      });
+    }
   }
 
   return result;
