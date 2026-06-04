@@ -444,38 +444,38 @@ function step3c_sectionBudget(defects, costTableText, reportTotal) {
     if (amount >= 200 && (!reportTotal || amount <= reportTotal)) { d.c = amount; d._cs = 'report'; }
   });
 
-  // Pass B: section-budget distribution for remainder
-  if (!reportTotal || reportTotal <= 0 || !costTableText || !costTableText.trim()) return result;
-
-  const secRe = /([^\n\d:–\-|.]{2,35})\s*(?:[:–\-|]|\.{2,})\s*(\d{1,3}(?:,\d{3})+|\d{4,7})\s*(?:ש['”״””]ח|₪)?/gi;
-  const sections = {};
-  for (const m of costTableText.matchAll(secRe)) {
-    const name = m[1].trim().replace(/\s+/g, ' ');
-    const amount = parseInt(m[2].replace(/,/g, ''));
-    if (amount >= 1000 && amount <= reportTotal * 0.95 && name.length >= 2) {
-      sections[name] = Math.max(sections[name] || 0, amount);
+  // Pass B: section-budget distribution for remainder (only when cost table text is available)
+  if (reportTotal > 0 && costTableText && costTableText.trim()) {
+    const secRe = /([^\n\d:–\-|.]{2,35})\s*(?:[:–\-|]|\.{2,})\s*(\d{1,3}(?:,\d{3})+|\d{4,7})\s*(?:ש['”״””]ח|₪)?/gi;
+    const sections = {};
+    for (const m of costTableText.matchAll(secRe)) {
+      const name = m[1].trim().replace(/\s+/g, ' ');
+      const amount = parseInt(m[2].replace(/,/g, ''));
+      if (amount >= 1000 && amount <= reportTotal * 0.95 && name.length >= 2) {
+        sections[name] = Math.max(sections[name] || 0, amount);
+      }
     }
-  }
-  const byArea = {};
-  result.forEach((d, i) => {
-    if (parseInt((d.c || '').toString().replace(/[^\d]/g, '')) >= 200) return;
-    const area = (d.area || 'כללי').trim();
-    if (!byArea[area]) byArea[area] = [];
-    byArea[area].push(i);
-  });
-
-  for (const [area, indices] of Object.entries(byArea)) {
-    let budget = 0;
-    for (const [sName, amount] of Object.entries(sections)) {
-      if (area.includes(sName) || sName.includes(area)) { budget = amount; break; }
-    }
-    if (!budget) continue;
-    const totalWeight = indices.reduce((s, i) => s + (SEV_WEIGHT[result[i].s] || 1), 0);
-    indices.forEach(i => {
-      const w = SEV_WEIGHT[result[i].s] || 1;
-      result[i].c = Math.max(200, Math.round((w / totalWeight) * budget));
-      result[i]._cs = 'section';
+    const byArea = {};
+    result.forEach((d, i) => {
+      if (parseInt((d.c || '').toString().replace(/[^\d]/g, '')) >= 200) return;
+      const area = (d.area || 'כללי').trim();
+      if (!byArea[area]) byArea[area] = [];
+      byArea[area].push(i);
     });
+
+    for (const [area, indices] of Object.entries(byArea)) {
+      let budget = 0;
+      for (const [sName, amount] of Object.entries(sections)) {
+        if (area.includes(sName) || sName.includes(area)) { budget = amount; break; }
+      }
+      if (!budget) continue;
+      const totalWeight = indices.reduce((s, i) => s + (SEV_WEIGHT[result[i].s] || 1), 0);
+      indices.forEach(i => {
+        const w = SEV_WEIGHT[result[i].s] || 1;
+        result[i].c = Math.max(200, Math.round((w / totalWeight) * budget));
+        result[i]._cs = 'section';
+      });
+    }
   }
 
   // Pass C: distribute reportTotal to any defects still without a cost source
