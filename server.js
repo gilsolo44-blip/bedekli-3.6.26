@@ -315,6 +315,24 @@ function isIntroPage(text) {
 
 // ── Step 2: Noise Filtration (JavaScript only) ───────────────────────────────
 
+// Returns true if a page is a table-of-contents page (titles + page numbers, no defect content)
+const TOC_LINE_RE = /^.{1,50}\.{3,}\s*\d+\s*$|^.{1,50}\s{3,}\d+\s*$/;
+const DEFECT_LINE_RE = /נמצא|ליקוי|בעיה|סדק|רטיב|דליפ|חסר|לא\s*תקין|ממצא|פגם|נצפ|נדרש/;
+
+function isTocPage(pageText, extraSignals) {
+  const text = pageText.trim();
+  if (text.length < 20) return false;
+  // Explicit TOC header
+  const signals = ['תוכן עניינים', 'תוכן\nעניינים', ...(extraSignals || [])];
+  if (signals.some(s => text.includes(s))) return true;
+  // Heuristic: >60% of non-empty lines look like "label .... N" and no defect keywords
+  const lines = text.split('\n').filter(l => l.trim().length > 0);
+  if (lines.length < 3) return false;
+  const tocLines = lines.filter(l => TOC_LINE_RE.test(l.trim())).length;
+  const hasDefect = DEFECT_LINE_RE.test(text);
+  return (tocLines / lines.length) > 0.6 && !hasDefect;
+}
+
 function step2_filter(pdfText) {
   let clean = pdfText;
   // Adaptive intro strip — detect by content, not page number
@@ -336,6 +354,22 @@ function step2_filter(pdfText) {
       _rebuilt += `\n--- עמוד ${_pn} ---\n${_txt}`;
     }
     if (_stripped > 0) clean = _rebuilt;
+  }
+  // TOC-page pass — remove table-of-contents pages found anywhere in the document
+  {
+    const _parts2 = clean.split(/---\s*עמוד\s*(\d+)\s*---/);
+    let _rebuilt2 = _parts2[0];
+    let _tocStripped = 0;
+    for (let _i = 1; _i < _parts2.length; _i += 2) {
+      const _pn  = _parts2[_i];
+      const _txt = _parts2[_i + 1] || '';
+      if (isTocPage(_txt)) {
+        _tocStripped++;
+        continue;
+      }
+      _rebuilt2 += `\n--- עמוד ${_pn} ---\n${_txt}`;
+    }
+    if (_tocStripped > 0) clean = _rebuilt2;
   }
   // Strip footers
   clean = clean.replace(/יש לקרוא מסמך זה במלואו[^\n]*/g, '');
@@ -1237,7 +1271,7 @@ function tryProviders(system, user, log, callback, idx = 0, providers = PROVIDER
 // ── Step 3: Targeted Extraction (per room) ───────────────────────────────────
 
 const SHORT_PROMPT = `חלץ ליקויים מטקסט בדק בית בעברית. JSON בלבד ללא backticks.
-פורמט: {"d":[{"t":"כותרת ספציפית","ds":"תיאור מלא ומעמיק","rec":"פעולה נדרשת לתיקון (5-12 מילים)","s":"sev","p":מספר_עמוד,"q":"ציטוט מורחב מהדוח","c":עלות_בשקלים}]}
+פורמט: {"d":[{"t":"כותרת ספציפית","ds":"תיאור מלא ומעמיק","rec":"פעולה נדרשת לתיקון (5-12 מילים)","s":"sev","p":מספר_עמוד,"q":"ציטוט מורחב מהדוח","c":עלות_בשקלים,"area":"שם חדר/מיקום"}]}
 
 sev:
 - critical = מסוכן (בטיחות: מעקה רופף, זכוכיות לא מוצמדות, סדק קונסטרוקטיבי, סכנת התחשמלות, דליפת גז)
@@ -1275,7 +1309,11 @@ sev:
 - שפת אדם פשוטה: "יש סדקים על הקיר" ולא "נסדקות ממשקי חיפוי"
 - דלג על תקנים, ציטוטי סעיפים, פסקאות מבוא
 - כל פריט בולט (▪ או מספור) הוא ליקוי נפרד
-- p = מספר עמוד שמופיע ב"[עמוד N]" הקרוב`;
+- p = מספר עמוד שמופיע ב"[עמוד N]" הקרוב
+
+- area = המיקום הספציפי של הליקוי בנכס (סלון, מטבח, חדר שינה, ממ"ד, מרפסת, חדר אמבטיה וכו׳).
+  אם הטקסט מציין מיקום ספציפי — חלץ אותו.
+  אם לא מצוין מיקום — החזר מחרוזת ריקה ("")`;
 
 const CONCURRENCY = 4;
 const MIN_STAGGER = 400; // ms between consecutive slot launches
@@ -1408,7 +1446,7 @@ function step3_extract(byRoom, costMap, callback, archetype) {
         const prefix = r.task.totalChunks > 1 ? `  [chunk ${r.task.chunkIdx + 1}/${r.task.totalChunks}]` : '';
         r.subLog.forEach(l => log.push(prefix ? `${prefix} ${l}` : l));
         if (r.err) { failed++; return; }
-        const defects = parseDefects(r.raw).map(d => ({ ...d, area: room }));
+        const defects = parseDefects(r.raw).map(d => ({ ...d, area: (d.area && d.area.trim()) ? d.area.trim() : room }));
         allDefects.push(...defects);
         total += defects.length;
       });
@@ -1435,7 +1473,7 @@ function step3_extract(byRoom, costMap, callback, archetype) {
       tryProviders(SHORT_PROMPT, userMsg, retryLog, (err, raw) => {
         retryLog.forEach(l => log.push(`  [retry:${room}] ${l}`));
         if (!err && raw) {
-          const defects = parseDefects(raw).map(d => ({ ...d, area: room }));
+          const defects = parseDefects(raw).map(d => ({ ...d, area: (d.area && d.area.trim()) ? d.area.trim() : room }));
           if (defects.length > 0) {
             allDefects.push(...defects);
             log.push(`  [retry:${room}] → ${defects.length} ליקויים`);
