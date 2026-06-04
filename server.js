@@ -4,6 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Lazy-require archetypeDetector (avoids load-time errors if data/ doesn't exist yet)
+let _archetypeDetector;
+function _ensureDetector() {
+  if (!_archetypeDetector) {
+    _archetypeDetector = require('./lib/archetypeDetector');
+  }
+}
+
 // ── Load env ─────────────────────────────────────────────────────────────────
 try {
   fs.readFileSync(path.join(__dirname, '.env.local'), 'utf8').split('\n').forEach(line => {
@@ -1220,7 +1228,9 @@ const MIN_STAGGER = 400; // ms between consecutive slot launches
 const PAGES_PER_CHUNK = 5;
 const MAX_CHARS_PER_CHUNK = 8000;
 
-function buildStep3Tasks(byRoom, costMap) {
+function buildStep3Tasks(byRoom, costMap, archetype) {
+  archetype = archetype || 'UNKNOWN';
+  _ensureDetector();
   const tasks = [];
   const rooms = Object.keys(byRoom).filter(r => byRoom[r].length >= 30);
   for (const room of rooms) {
@@ -1247,8 +1257,19 @@ function buildStep3Tasks(byRoom, costMap) {
       if (cur.length) chunks.push({ pageNums: cur.map(x => x.num), text: cur.map(x => x.block).join('').trim() });
     }
 
-    const totalChunks = chunks.length;
-    chunks.forEach((c, idx) => {
+    // Sub-split each page-level chunk by defect boundary using the detected archetype.
+    // This fixes Bug #2: large blocks that contain 50+ defects were sent as one LLM call,
+    // causing only 2-3 defects to be returned (context window overflow).
+    const allSubChunks = [];
+    for (const c of chunks) {
+      const subParts = _archetypeDetector.splitByDefectBoundary(c.text, archetype);
+      for (const part of subParts) {
+        allSubChunks.push({ pageNums: c.pageNums, text: part });
+      }
+    }
+
+    const totalChunks = allSubChunks.length;
+    allSubChunks.forEach((c, idx) => {
       const costHints = c.pageNums
         .filter(p => costMap[p] && costMap[p].length)
         .map(p => `עמוד ${p}: ${costMap[p].map(v => '₪' + v.toLocaleString()).join(', ')}`)
@@ -1261,10 +1282,10 @@ function buildStep3Tasks(byRoom, costMap) {
   return tasks;
 }
 
-function step3_extract(byRoom, costMap, callback) {
+function step3_extract(byRoom, costMap, callback, archetype) {
   const log = [];
   const allDefects = [];
-  const tasks = buildStep3Tasks(byRoom, costMap);
+  const tasks = buildStep3Tasks(byRoom, costMap, archetype);
   let nextIdx = 0;
   let pending = 0;
   const results = new Array(tasks.length);
