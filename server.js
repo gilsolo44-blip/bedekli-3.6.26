@@ -12,6 +12,12 @@ function _ensureDetector() {
   }
 }
 
+let _archetypeRules;
+function getArchetypeRules(archetype) {
+  if (!_archetypeRules) _archetypeRules = require('./lib/archetypeRules');
+  return _archetypeRules.getArchetypeRules(archetype);
+}
+
 // ── Load env ─────────────────────────────────────────────────────────────────
 try {
   fs.readFileSync(path.join(__dirname, '.env.local'), 'utf8').split('\n').forEach(line => {
@@ -280,10 +286,19 @@ function step1_llm(cleanText, log, callback, archetypeHint) {
     return callback(cached);
   }
   const outline = makeStructureOutline(cleanText);
-  const outlineWithHint = archetypeHint
-    ? `[${archetypeHint}]\n\n${outline}`
-    : outline;
-  log.push(`  [outline] ${outline.split('\n').length} עמודים, ${outline.length} תווים${archetypeHint ? ' [+archetype hint]' : ''}`);
+  let _arcCtx = '';
+  if (archetypeHint) {
+    const _ar = getArchetypeRules(archetypeHint);
+    const _parts = [
+      `[ארכיטיפ: ${archetypeHint}]`,
+      _ar.structure_hint   ? `[מבנה: ${_ar.structure_hint}]`                                                 : '',
+      _ar.toc_skip_signals && _ar.toc_skip_signals.length
+        ? `[תוכן עניינים — דלג על עמודים עם: ${_ar.toc_skip_signals.join(', ')}]` : '',
+    ].filter(Boolean);
+    _arcCtx = _parts.join('\n');
+  }
+  const outlineWithHint = _arcCtx ? `${_arcCtx}\n\n${outline}` : outline;
+  log.push(`  [outline] ${outline.split('\n').length} עמודים, ${outline.length} תווים${archetypeHint ? ` [+archetype:${archetypeHint}]` : ''}`);
   tryProviders(STRUCT_PROMPT, outlineWithHint, log, (err, raw) => {
     if (err) return callback(null);
     try {
@@ -1311,9 +1326,10 @@ sev:
 - כל פריט בולט (▪ או מספור) הוא ליקוי נפרד
 - p = מספר עמוד שמופיע ב"[עמוד N]" הקרוב
 
-- area = המיקום הספציפי של הליקוי בנכס (סלון, מטבח, חדר שינה, ממ"ד, מרפסת, חדר אמבטיה וכו׳).
-  אם הטקסט מציין מיקום ספציפי — חלץ אותו.
-  אם לא מצוין מיקום — החזר מחרוזת ריקה ("")`;
+- area = החדר/המיקום הפיזי בנכס בלבד.
+  ✓ מותר: סלון, מטבח, חדר שינה, ממ"ד, מרפסת, מסדרון, כביסה, גג, חצר, שירותים, אמבטיה, כניסה, חדר הורים
+  ✗ אסור: ריצוף, אלומיניום, קרמיקה, חשמל, איטום, נגרות, אינסטלציה, רטיבות (אלה קטגוריות — לא מיקום!)
+  אם הטקסט מציין מיקום פיזי — חלץ אותו. אם לא — החזר ""`;
 
 const CONCURRENCY = 4;
 const MIN_STAGGER = 400; // ms between consecutive slot launches
