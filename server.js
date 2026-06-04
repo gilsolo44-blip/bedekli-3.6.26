@@ -1231,6 +1231,15 @@ const MIN_STAGGER = 400; // ms between consecutive slot launches
 const PAGES_PER_CHUNK = 5;
 const MAX_CHARS_PER_CHUNK = 8000;
 
+// ── Step 0c: Archetype Detection ─────────────────────────────────────────────
+
+function step0c_detectArchetype(cleanText) {
+  _ensureDetector();
+  const profiles = _archetypeDetector.loadProfiles();
+  const companyName = _archetypeDetector.extractCompanyName(cleanText.slice(0, 800), profiles);
+  return _archetypeDetector.detectArchetypeSync(cleanText, companyName);
+}
+
 function buildStep3Tasks(byRoom, costMap, archetype) {
   archetype = archetype || 'UNKNOWN';
   _ensureDetector();
@@ -1485,6 +1494,10 @@ function pipeline(pdfText, propertyType, opts, callback) {
   const cleanText = step2_filter(pdfText);
   fullLog.push(`[Step 2 - Noise Filtration] -> ${pdfText.length}→${cleanText.length} chars, ${Date.now()-t2}ms`);
 
+  // Step 0c — archetype detection
+  const archetypeProfile = step0c_detectArchetype(cleanText);
+  fullLog.push(`[Step 0c] archetype=${archetypeProfile.archetype} confidence=${archetypeProfile.confidence}${archetypeProfile.fromCache ? ' (cache)' : ''}`);
+
   // Build cleanPageMap (shared by step2b and cost-context)
   const cleanPages = cleanText.split(/---\s*עמוד\s*(\d+)\s*---/);
   const cleanPageMap = {};
@@ -1671,9 +1684,9 @@ function pipeline(pdfText, propertyType, opts, callback) {
           }
         }); // end step3d
       });
-    });
+    }, archetypeProfile.archetype);
     } // end runPipeline
-  });
+  }, archetypeProfile.hint);
 }
 
 // ── HTTP server ──────────────────────────────────────────────────────────────
