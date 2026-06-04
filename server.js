@@ -227,7 +227,7 @@ function parseStep1Json(raw, cleanText) {
   return js.sections.length > 0 ? js : null;
 }
 
-function step1_llm(cleanText, log, callback) {
+function step1_llm(cleanText, log, callback, archetypeHint) {
   const totalPages = (cleanText.match(/---\s*עמוד\s*(\d+)\s*---/g) || []).length;
   if (totalPages === 0) {
     log.push('  [step1] no page markers in text (scanned PDF?) — skip LLM → vision fallback');
@@ -246,8 +246,11 @@ function step1_llm(cleanText, log, callback) {
     return callback(cached);
   }
   const outline = makeStructureOutline(cleanText);
-  log.push(`  [outline] ${outline.split('\n').length} עמודים, ${outline.length} תווים`);
-  tryProviders(STRUCT_PROMPT, outline, log, (err, raw) => {
+  const outlineWithHint = archetypeHint
+    ? `[${archetypeHint}]\n\n${outline}`
+    : outline;
+  log.push(`  [outline] ${outline.split('\n').length} עמודים, ${outline.length} תווים${archetypeHint ? ' [+archetype hint]' : ''}`);
+  tryProviders(STRUCT_PROMPT, outlineWithHint, log, (err, raw) => {
     if (err) return callback(null);
     try {
       const js = parseStep1Json(raw, cleanText);
