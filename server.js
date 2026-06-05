@@ -656,6 +656,41 @@ function guessCategory(title, desc) {
   return { code: 'CAT-16', label: 'כללי ושונות', costKey: 'כללי' };
 }
 
+// ── Room rescue: when area is a work-type section name, extract physical room ─
+
+const WORK_TYPE_AREA_RE = /^(ריצוף|טיח|צבע|איטום|חשמל|תקשורת|אינסטלציה|נגרות|אלומיניום|חיפוי|גבס|מחיצה|שלד|מבנה|בטיחות|פיתוח|גינה|גג|רטיבות|עבודות|תקנות|ממצאים|כללי|שונות|ריצוף\s+ח|ניקוז|ביוב|מיזוג|אוורור|כיבוי|גז\b)/i;
+
+const ROOM_RESCUE_PATTERNS = [
+  { re: /סלון\s+אורחים/,                  label: 'סלון אורחים' },
+  { re: /פינת\s+אוכל|חדר\s+אוכל/,        label: 'פינת אוכל' },
+  { re: /סלון|מגורים/,                    label: 'סלון' },
+  { re: /מטבח/,                           label: 'מטבח' },
+  { re: /חדר\s*הורים|חדר\s*שינה\s*ראשי/, label: 'חדר הורים' },
+  { re: /חד"ש|חדר\s*שינה/,               label: 'חדר שינה' },
+  { re: /חדר\s*ילד/,                      label: 'חדר ילדים' },
+  { re: /אמבטיה/,                         label: 'אמבטיה' },
+  { re: /שירותי\s*אורחים/,               label: 'שירותי אורחים' },
+  { re: /שירותים?/,                       label: 'שירותים' },
+  { re: /מסדרון|פרוזדור/,                label: 'מסדרון' },
+  { re: /כניסה\s+(?:ראשית|לדירה)/,       label: 'כניסה' },
+  { re: /מרפסת\s*(?:שירות|כביסה)/,       label: 'מרפסת שירות' },
+  { re: /מרפסת/,                          label: 'מרפסת' },
+  { re: /מסתור\s*כביסה|חדר\s*כביסה/,    label: 'חדר כביסה' },
+  { re: /ממ"ד|מרחב\s*מוגן/,             label: 'ממ"ד' },
+  { re: /מחסן/,                           label: 'מחסן' },
+  { re: /חניה|חנייה|חנות/,              label: 'חניה' },
+  { re: /מרתף/,                           label: 'מרתף' },
+  { re: /גג\b/,                           label: 'גג' },
+  { re: /חצר|גינה/,                      label: 'חצר' },
+];
+
+function tryRescueRoom(text) {
+  for (const { re, label } of ROOM_RESCUE_PATTERNS) {
+    if (re.test(text)) return label;
+  }
+  return null;
+}
+
 // ── Work Type inference ──────────────────────────────────────────────────────
 
 function inferWorkType(rec) {
@@ -678,7 +713,11 @@ function step4_schema(rawDefects) {
   return rawDefects.map((d, i) => {
     const sev = VALID_SEV.includes(d.s) ? d.s : 'medium';
     const pageNum = parseInt(d.p) || 1;
-    const area = d.area || 'כללי';
+    const rawArea = (d.area || 'כללי').trim();
+    // If area looks like a work-type section name, try to rescue the physical room from defect text
+    const area = WORK_TYPE_AREA_RE.test(rawArea)
+      ? (tryRescueRoom((d.t || '') + ' ' + (d.ds || '') + ' ' + (d.rec || '')) || rawArea)
+      : rawArea;
     // Guard: if LLM mistakenly put the room name as the title, use desc instead
     const rawTitle = (d.t || '').trim();
     const title = rawTitle === area || rawTitle === '' ? (d.ds || d.t || '') : rawTitle;
