@@ -26,7 +26,7 @@ try {
   });
 } catch {}
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 339;
 const SHARED_DIR = process.env.VERCEL ? '/tmp/shared' : path.join(__dirname, 'shared');
 try { if (!fs.existsSync(SHARED_DIR)) fs.mkdirSync(SHARED_DIR); } catch {}
 
@@ -1162,7 +1162,7 @@ function openrouterCall(_, system, user, callback, attempt = 1) {
       'Content-Type':'application/json',
       'Authorization':`Bearer ${OPENROUTER_KEY}`,
       'Content-Length':Buffer.byteLength(body),
-      'HTTP-Referer':'http://localhost:3000',
+      'HTTP-Referer':'http://localhost:339',
       'X-Title':'Bedekli'
     }
   }, body, (err, status, text) => {
