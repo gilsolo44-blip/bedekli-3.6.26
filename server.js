@@ -1332,6 +1332,17 @@ sev:
   ✗ אסור: ריצוף, אלומיניום, קרמיקה, חשמל, איטום, נגרות, אינסטלציה, רטיבות (אלה קטגוריות — לא מיקום!)
   אם הטקסט מציין מיקום פיזי — חלץ אותו. אם לא — החזר ""`;
 
+const SIMPLIFY_PROMPT = `אתה מומחה להנגשת מידע טכני לקהל הרחב בישראל.
+קיבלת מערך JSON של ליקויי בדק בית. עבור כל ליקוי, מלא את שדה simplified_explanation.
+
+כללי כתיבה:
+1. עד 2 משפטים. ענה על: מה הבעיה? למה חשוב? מה קורה אם לא מטפלים?
+2. מינוח: אשפרה→איטום, מישקים→פרזול, קפילריות→ספיגת לחות, קונסטרוקציה→מבנה נושא, ריצוף צף→ריצוף לא מחובר, מיסב→תושבת, כשל קפילרי→חדירת לחות
+3. אל תמציא פרטים שלא מופיעים ב-title/description/action.
+4. גוף שלישי, לא פנייה ישירה.
+
+החזר JSON בלבד, ללא backticks: [{...אותם שדות..., "simplified_explanation":"..."}]`;
+
 const CONCURRENCY = 4;
 const MIN_STAGGER = 400; // ms between consecutive slot launches
 const PAGES_PER_CHUNK = 5;
@@ -1410,6 +1421,55 @@ function buildStep3Tasks(byRoom, costMap, archetype) {
     });
   }
   return tasks;
+}
+
+function step3e_simplify(defects, log, callback) {
+  if (!defects || defects.length === 0) return callback(defects);
+
+  const BATCH_SIZE = 15;
+  const batches = [];
+  for (let i = 0; i < defects.length; i += BATCH_SIZE) {
+    batches.push(defects.slice(i, i + BATCH_SIZE));
+  }
+
+  const result = new Array(defects.length);
+  let batchIdx = 0;
+
+  function nextBatch() {
+    if (batchIdx >= batches.length) return callback(result);
+    const batch = batches[batchIdx];
+    const startIdx = batchIdx * BATCH_SIZE;
+    batchIdx++;
+
+    const userMsg = JSON.stringify(
+      batch.map(d => ({
+        title:       d.title || '',
+        description: d.description || '',
+        action:      d.action || ''
+      }))
+    );
+
+    tryProviders(SIMPLIFY_PROMPT, userMsg, log, (err, raw) => {
+      if (err || !raw) {
+        batch.forEach((d, i) => { result[startIdx + i] = { ...d, simplified_explanation: '' }; });
+        return nextBatch();
+      }
+      let parsed = null;
+      try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); } catch {}
+      batch.forEach((d, i) => {
+        result[startIdx + i] = {
+          ...d,
+          simplified_explanation:
+            (parsed && parsed[i] && typeof parsed[i].simplified_explanation === 'string')
+              ? parsed[i].simplified_explanation
+              : ''
+        };
+      });
+      nextBatch();
+    }, 0, PROVIDERS_FAST);
+  }
+
+  nextBatch();
 }
 
 function step3_extract(byRoom, costMap, callback, archetype) {
