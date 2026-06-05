@@ -798,7 +798,7 @@ html,body{
 
 <script>
 function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-let D=[],ST={},NT={},RID=null,PT='new',VM='rooms',SF='all',STF='all',PIMGS={},RT=0,LSKEY='';
+let D=[],ST={},NT={},RID=null,PT='new',VM='rooms',SF='all',STF='all',WTF='all',PIMGS={},RT=0,LSKEY='';
 const SO=['critical','high','medium','low','cosmetic'];
 const SL={critical:'מסוכן',high:'ליקוי הנדסי',medium:'ליקוי בינוני',low:'ליקוי קל',cosmetic:'קוסמטי'};
 const SC2={critical:'C',high:'H',medium:'M',low:'L',cosmetic:'K'};
@@ -870,7 +870,13 @@ function updateDI(){
 (async()=>{
   const raw=sessionStorage.getItem('bdkl_report');
   if(!raw){window.location.href='/';return;}
-  try{PIMGS=JSON.parse(sessionStorage.getItem('bdkl_imgs')||'{}');}catch{}
+  try{
+    const ss=JSON.parse(sessionStorage.getItem('bdkl_imgs')||'{}');
+    if(Object.keys(ss).length>0){PIMGS=ss;}else{
+      const bk=JSON.parse(localStorage.getItem('bdkl_imgs_bk')||'null');
+      if(bk&&bk.imgs&&(Date.now()-bk.ts)<86400000)PIMGS=bk.imgs;
+    }
+  }catch{}
   const{reportId:rid,defects,fileName,propType:pt,reportTotal:rt=0,structureType:st='rooms'}=JSON.parse(raw); RT=rt;
   RID=rid;PT=pt;
   D=defects.map((d,i)=>({...d,id:i,sev:SO.includes(d.sev)?d.sev:'medium',cMin:Math.abs(Number(d.cMin)||0),cMax:Math.abs(Number(d.cMax)||0)}));
@@ -1011,6 +1017,28 @@ function goSev(s){
   setView('all',allBtn);
 }
 
+function goCategory(label){
+  SF='all';STF='all';WTF='all';
+  document.querySelectorAll('#SevBar .fc').forEach(c=>{c.className='fc';});
+  const allSevBtn=document.querySelector('#SevBar .fc[data-s="all"]');if(allSevBtn)allSevBtn.className='fc a';
+  document.querySelectorAll('#StBar .fc').forEach(c=>{c.className='fc';});
+  const allStBtn=document.querySelector('#StBar .fc[data-s="all"]');if(allStBtn)allStBtn.className='fc a';
+  const allBtn=document.getElementById('vt-all');
+  setView('all',allBtn);
+  setTimeout(()=>{document.getElementById('Q').value=label;render();},60);
+}
+function goWorktype(wt){
+  SF='all';STF='all';
+  document.getElementById('Q').value='';
+  document.querySelectorAll('#SevBar .fc').forEach(c=>{c.className='fc';});
+  const allSevBtn=document.querySelector('#SevBar .fc[data-s="all"]');if(allSevBtn)allSevBtn.className='fc a';
+  document.querySelectorAll('#StBar .fc').forEach(c=>{c.className='fc';});
+  const allStBtn=document.querySelector('#StBar .fc[data-s="all"]');if(allStBtn)allStBtn.className='fc a';
+  const allBtn=document.getElementById('vt-all');
+  setView('all',allBtn);
+  WTF=wt;
+}
+
 function renderGroupedView(mode){
   const q=document.getElementById('Q').value.trim().toLowerCase();
   const filtered=D.filter(d=>{
@@ -1028,14 +1056,31 @@ function renderGroupedView(mode){
     const CAT_ORDER=['CAT-01','CAT-02','CAT-03','CAT-04','CAT-05','CAT-06','CAT-07','CAT-08','CAT-09','CAT-10','CAT-11','CAT-12','CAT-13','CAT-14','CAT-15','CAT-16'];
     const bycat={};
     filtered.forEach(d=>{const key=d.category||'CAT-16';(bycat[key]=bycat[key]||[]).push(d);});
-    html=CAT_ORDER.filter(c=>bycat[c]).map(c=>{
-      const items=bycat[c];
-      const label=esc(items[0].categoryLabel||c);
-      const total=items.reduce((a,d)=>a+(d.cMin||0),0);
-      const costStr=total?' · '+fN(total):'';
-      const safe=label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return`<div class="grp"><span class="grp-name">${label}</span><span class="grp-cnt">${items.length} ממצאים${costStr}</span><button class="grp-tog" onclick="toggleGrp('${safe}',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg></button></div><div id="GC-${CSS.escape(label)}">${items.map((d,i)=>card(d,i)).join('')}</div>`;
-    }).join('');
+    const cards=CAT_ORDER.filter(c=>bycat[c]).map(c=>{
+      const items=bycat[c],cnt=items.length;
+      const rawLabel=items[0].categoryLabel||c;
+      const label=esc(rawLabel);
+      const cMin=items.reduce((a,d)=>a+(d.cMin||0),0);
+      const cMax=items.reduce((a,d)=>a+(d.cMax||d.cMin||0),0);
+      const costStr=cMin?fR(cMin,cMax):'';
+      const sevCnt={};items.forEach(d=>{sevCnt[d.sev]=(sevCnt[d.sev]||0)+1;});
+      const bar=SEV_BAR_ORDER.filter(s=>sevCnt[s]).map(s=>{
+        const pct=Math.round(sevCnt[s]/cnt*100);
+        return`<span class="${SEV_BAR_CL[s]}" style="width:${pct}%"></span>`;
+      }).join('');
+      return`<div class="broom" data-cat="${esc(rawLabel)}" onclick="goCategory(this.dataset.cat)">
+        <div class="broom-top">
+          <div class="broom-ico">${ico(rawLabel)}</div>
+          <div class="broom-info">
+            <div class="broom-name">${label}</div>
+            <div class="broom-cnt">${cnt} ליקויים</div>
+          </div>
+        </div>
+        <div class="sev-bar">${bar}</div>
+        ${costStr?`<div class="broom-cost">${costStr}</div>`:''}
+      </div>`;
+    });
+    html=`<div class="bento-grid">${cards.join('')}</div>`;
   } else {
     const WT_ORDER=[
       {key:'demolish_redo',label:'פירוק ובנייה מחדש'},
@@ -1051,13 +1096,29 @@ function renderGroupedView(mode){
     ];
     const bywt={};
     filtered.forEach(d=>{const key=d.workType||'repair';(bywt[key]=bywt[key]||[]).push(d);});
-    html=WT_ORDER.filter(({key})=>bywt[key]).map(({key,label})=>{
-      const items=bywt[key];
-      const total=items.reduce((a,d)=>a+(d.cMin||0),0);
-      const costStr=total?' · '+fN(total):'';
-      const safe=label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return`<div class="grp"><span class="grp-name">${label}</span><span class="grp-cnt">${items.length} ממצאים${costStr}</span><button class="grp-tog" onclick="toggleGrp('${safe}',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg></button></div><div id="GC-${CSS.escape(label)}">${items.map((d,i)=>card(d,i)).join('')}</div>`;
-    }).join('');
+    const cards=WT_ORDER.filter(({key})=>bywt[key]).map(({key,label})=>{
+      const items=bywt[key],cnt=items.length;
+      const cMin=items.reduce((a,d)=>a+(d.cMin||0),0);
+      const cMax=items.reduce((a,d)=>a+(d.cMax||d.cMin||0),0);
+      const costStr=cMin?fR(cMin,cMax):'';
+      const sevCnt={};items.forEach(d=>{sevCnt[d.sev]=(sevCnt[d.sev]||0)+1;});
+      const bar=SEV_BAR_ORDER.filter(s=>sevCnt[s]).map(s=>{
+        const pct=Math.round(sevCnt[s]/cnt*100);
+        return`<span class="${SEV_BAR_CL[s]}" style="width:${pct}%"></span>`;
+      }).join('');
+      return`<div class="broom" onclick="goWorktype('${key}')">
+        <div class="broom-top">
+          <div class="broom-ico">${ico(label)}</div>
+          <div class="broom-info">
+            <div class="broom-name">${esc(label)}</div>
+            <div class="broom-cnt">${cnt} ליקויים</div>
+          </div>
+        </div>
+        <div class="sev-bar">${bar}</div>
+        ${costStr?`<div class="broom-cost">${costStr}</div>`:''}
+      </div>`;
+    });
+    html=`<div class="bento-grid">${cards.join('')}</div>`;
   }
   el.innerHTML=(sev?sev.outerHTML:'')+html;
 }
@@ -1072,6 +1133,7 @@ function render(){
     if(SF!=='all'&&d.sev!==SF)return false;
     if(STF!=='all'&&ST[d.id]!==STF)return false;
     if(active!=='all'&&d.sev!==active)return false;
+    if(WTF!=='all'&&(d.workType||'repair')!==WTF)return false;
     if(q){const h=`${d.title||''} ${d.finding||''} ${d.action||''} ${d.area||''} ${d.categoryLabel||''} ${d.category||''}`.toLowerCase();if(!h.includes(q))return false;}
     return true;
   });
@@ -1220,7 +1282,7 @@ function toggleMobFilt(){
 }
 
 function setView(v,btn){
-  VM=v;
+  VM=v;WTF='all';
   document.querySelectorAll('.vt').forEach(b=>b.classList.remove('on'));
   if(btn)btn.classList.add('on');
   document.getElementById('FR').dataset.active='all';

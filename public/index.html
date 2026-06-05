@@ -981,6 +981,7 @@ async function handleFile(file){
 
 function goToReport(defects,fileName,reportTotal,structureType){
   try{sessionStorage.setItem('bdkl_imgs',JSON.stringify(PIMGS));}catch(e){PIMGS={};toast('תמונות לא נשמרו (קובץ גדול מדי) — ממשיך ללא תמונות');}
+  try{localStorage.setItem('bdkl_imgs_bk',JSON.stringify({ts:Date.now(),imgs:PIMGS}));}catch(e){}
   try{sessionStorage.setItem('bdkl_report',JSON.stringify({reportId:null,defects,fileName,propType,reportTotal:reportTotal||0,structureType:structureType||'rooms'}));}catch(e2){toast('שגיאת שמירה');return;}
   window.location.href='/report.html';
 }

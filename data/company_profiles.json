@@ -1,27 +1,158 @@
 {
-  "הדס ביקורת מבנים בע\"מ": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 44 },
-  "הדס ביקורת מבנים": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 7 },
-  "אגם שירותי בדק בית": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 35 },
-  "פלס": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 23 },
-  "גולדאל הנדסה": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 19 },
-  "דובי מהנדסים בע\"מ": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 12 },
-  "איתן דמארי": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 6 },
-  "אלגן הנדסה": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 5 },
-  "טרמינל שירותי הנדסה ובדק בית בע\"מ": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 4 },
-  "עמנואל אשרוב": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 4 },
-  "שחר בדק בית": { "archetype": "HIERARCHICAL", "confidence": 0.9, "first_seen": "2026-06-04", "file_count": 3 },
-  "בדק בית המקורי": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 11 },
-  "בדק בית המקורי בע\"מ": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 6 },
-  "הורביץ מהנדסים": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 6 },
-  "חברות שונות": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 35 },
-  "טרמינל שירותי הנדסה ובדק בית": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 16 },
-  "תפארת ביקורת מבנים": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 12 },
-  "פרו הנדסה": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 4 },
-  "פרץ מהנדסים": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 7 },
-  "ארד בדק בית": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 8 },
-  "שירותי הנדסה": { "archetype": "KW_PARAGRAPH", "confidence": 0.85, "first_seen": "2026-06-04", "file_count": 4 },
-  "גלאור מהנדסים ויועצים": { "archetype": "NUMBERED_FLAT", "confidence": 0.8, "first_seen": "2026-06-04", "file_count": 10 },
-  "HD Eng. Services L.T.D": { "archetype": "TABLE", "confidence": 0.95, "first_seen": "2026-06-04", "file_count": 3 },
-  "בדק הבית": { "archetype": "TABLE", "confidence": 0.95, "first_seen": "2026-06-04", "file_count": 7 },
-  "לעד הנדסה": { "archetype": "UNKNOWN", "confidence": 0.3, "first_seen": "2026-06-04", "file_count": 4 }
+  "הדס ביקורת מבנים בע\"מ": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 44
+  },
+  "הדס ביקורת מבנים": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 7
+  },
+  "אגם שירותי בדק בית": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 35
+  },
+  "פלס": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 23
+  },
+  "גולדאל הנדסה": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 19
+  },
+  "דובי מהנדסים בע\"מ": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 12
+  },
+  "איתן דמארי": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 6
+  },
+  "אלגן הנדסה": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 5
+  },
+  "טרמינל שירותי הנדסה ובדק בית בע\"מ": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 4
+  },
+  "עמנואל אשרוב": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 4
+  },
+  "שחר בדק בית": {
+    "archetype": "HIERARCHICAL",
+    "confidence": 0.9,
+    "first_seen": "2026-06-04",
+    "file_count": 3
+  },
+  "בדק בית המקורי": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 11
+  },
+  "בדק בית המקורי בע\"מ": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 6
+  },
+  "הורביץ מהנדסים": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 6
+  },
+  "חברות שונות": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 35
+  },
+  "טרמינל שירותי הנדסה ובדק בית": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 16
+  },
+  "תפארת ביקורת מבנים": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 12
+  },
+  "פרו הנדסה": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 4
+  },
+  "פרץ מהנדסים": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 7
+  },
+  "ארד בדק בית": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 8
+  },
+  "שירותי הנדסה": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 4
+  },
+  "גלאור מהנדסים ויועצים": {
+    "archetype": "NUMBERED_FLAT",
+    "confidence": 0.8,
+    "first_seen": "2026-06-04",
+    "file_count": 10
+  },
+  "HD Eng. Services L.T.D": {
+    "archetype": "TABLE",
+    "confidence": 0.95,
+    "first_seen": "2026-06-04",
+    "file_count": 3
+  },
+  "בדק הבית": {
+    "archetype": "TABLE",
+    "confidence": 0.95,
+    "first_seen": "2026-06-04",
+    "file_count": 7
+  },
+  "לעד הנדסה": {
+    "archetype": "UNKNOWN",
+    "confidence": 0.3,
+    "first_seen": "2026-06-04",
+    "file_count": 4
+  },
+  "ערכי הסטיות": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-04",
+    "file_count": 1
+  }
 }
