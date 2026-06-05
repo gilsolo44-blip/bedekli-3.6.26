@@ -144,15 +144,27 @@
     "file_count": 7
   },
   "לעד הנדסה": {
-    "archetype": "UNKNOWN",
-    "confidence": 0.3,
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
     "first_seen": "2026-06-04",
-    "file_count": 4
+    "file_count": 5
   },
   "ערכי הסטיות": {
     "archetype": "KW_PARAGRAPH",
     "confidence": 0.85,
     "first_seen": "2026-06-04",
+    "file_count": 1
+  },
+  "ליקויי בנייה\nחוות דעת מקצועית": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-05",
+    "file_count": 1
+  },
+  "ביקורת מבנים בע\"מ": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-05",
     "file_count": 1
   }
 }
