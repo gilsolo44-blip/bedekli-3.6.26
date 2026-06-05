@@ -885,10 +885,18 @@ function updateDI(){
   try{const saved=JSON.parse(localStorage.getItem(LSKEY)||'{}');Object.assign(ST,saved.ST||{});Object.assign(NT,saved.NT||{});}catch{}
   document.getElementById('hT').textContent=fileName||'דוח בדק בית';
   document.getElementById('hS').textContent=PT==='yad2'?'YAD 2 · מעקב מו"מ':'NEW · דירה חדשה מקבלן';
-  if(st==='chapters'){
+  // Adapt tabs to report structure type
+  const roomsTab=document.querySelector('.vt[onclick*="rooms"]');
+  const catsTab=document.querySelector('.vt[onclick*="categories"]');
+  if(st==='systems'||st==='chapters'){
+    // Work-type or chapter organized — rooms view is meaningless, hide it
     document.getElementById('structBadge').classList.add('on');
-    const roomsTab=document.querySelector('.vt[onclick*="rooms"]');
-    if(roomsTab)roomsTab.textContent='פרקים';
+    if(roomsTab){roomsTab.style.display='none';roomsTab.classList.remove('on');}
+    if(catsTab){catsTab.classList.add('on');}
+    VM='categories';
+  }else if(st==='floors'){
+    // Floor-organized — rooms tab stays but rename to "קומות"
+    if(roomsTab)roomsTab.textContent='קומות';
   }
   try{
     const ocr=JSON.parse(sessionStorage.getItem('bdkl_ocr_warn')||'null');
