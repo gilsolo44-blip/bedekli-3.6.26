@@ -1344,6 +1344,7 @@ const SIMPLIFY_PROMPT = `אתה מומחה להנגשת מידע טכני לקה
 החזר JSON בלבד, ללא backticks: [{...אותם שדות..., "simplified_explanation":"..."}]`;
 
 const CONCURRENCY = 4;
+const BATCH_SIZE = 15;
 const MIN_STAGGER = 400; // ms between consecutive slot launches
 const PAGES_PER_CHUNK = 5;
 const MAX_CHARS_PER_CHUNK = 8000;
@@ -1424,9 +1425,9 @@ function buildStep3Tasks(byRoom, costMap, archetype) {
 }
 
 function step3e_simplify(defects, log, callback) {
-  if (!defects || defects.length === 0) return callback(defects);
+  if (!defects || defects.length === 0) return callback([]);
 
-  const BATCH_SIZE = 15;
+  const _t3e = Date.now();
   const batches = [];
   for (let i = 0; i < defects.length; i += BATCH_SIZE) {
     batches.push(defects.slice(i, i + BATCH_SIZE));
@@ -1436,7 +1437,10 @@ function step3e_simplify(defects, log, callback) {
   let batchIdx = 0;
 
   function nextBatch() {
-    if (batchIdx >= batches.length) return callback(result);
+    if (batchIdx >= batches.length) {
+      log.push(`[Step 3e] -> ${result.length} ליקויים הונגשו, ${Date.now() - _t3e}ms`);
+      return callback(result);
+    }
     const batch = batches[batchIdx];
     const startIdx = batchIdx * BATCH_SIZE;
     batchIdx++;
@@ -1999,4 +2003,4 @@ http.createServer((req, res) => {
 
 if (require.main === module) startServer();
 
-module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath, visionStructurePath, step3c_sectionBudget, SEV_WEIGHT, buildCatchAllChunks };
+module.exports = { pipeline, validateBbox, detectVisualPages, step4_schema, mergeDefects, geminiUploadFile, geminiDeleteFile, geminiVisionExtract, visionPath, visionStructurePath, step3c_sectionBudget, SEV_WEIGHT, buildCatchAllChunks, step3e_simplify };
