@@ -393,6 +393,12 @@ html,body{
   font-family:'Geist Mono',monospace;font-size:10.5px;font-weight:600;
   color:var(--oc);letter-spacing:-.1px;
 }
+/* Simplified explanation */
+.simp-exp{
+  font-size:12.5px;line-height:1.65;color:var(--s600);
+  background:var(--s50);border-radius:6px;padding:8px 10px;
+  margin-bottom:10px;border-right:2.5px solid var(--s200);
+}
 /* Note */
 .note-saved{
   font-size:11.5px;font-style:italic;color:var(--s500);
@@ -1259,6 +1265,7 @@ function card(d,i){
     <div class="card-exp" id="CE-${d.id}">
       ${srcEl}
       ${hasBbox?`<div class="defect-photo-slot" id="PHOTO-${d.id}" data-bbox="${d.bbox.join(',')}" data-page="${d.pageNum}"></div>`:''}
+      ${d.simplified_explanation?`<div class="simp-exp">${esc(d.simplified_explanation)}</div>`:''}
       <div class="act-row">
         <button class="ab ok ${st==='done'?'on':''}" onclick="setStatus(${d.id},'done')">טופל</button>
         <button class="ab wa ${st==='partial'?'on':''}" onclick="setStatus(${d.id},'partial')">חלקית</button>
