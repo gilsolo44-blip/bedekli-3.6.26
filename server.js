@@ -26,7 +26,7 @@ try {
   });
 } catch {}
 
-const PORT = process.env.PORT || 339;
+const PORT = process.env.PORT || 3000;
 const SHARED_DIR = process.env.VERCEL ? '/tmp/shared' : path.join(__dirname, 'shared');
 try { if (!fs.existsSync(SHARED_DIR)) fs.mkdirSync(SHARED_DIR); } catch {}
 
@@ -1162,7 +1162,7 @@ function openrouterCall(_, system, user, callback, attempt = 1) {
       'Content-Type':'application/json',
       'Authorization':`Bearer ${OPENROUTER_KEY}`,
       'Content-Length':Buffer.byteLength(body),
-      'HTTP-Referer':'http://localhost:339',
+      'HTTP-Referer':'http://localhost:3000',
       'X-Title':'Bedekli'
     }
   }, body, (err, status, text) => {
@@ -1444,7 +1444,7 @@ function step3e_simplify(defects, log, callback) {
     const userMsg = JSON.stringify(
       batch.map(d => ({
         title:       d.title || '',
-        description: d.description || '',
+        description: d.desc || '',
         action:      d.action || ''
       }))
     );
@@ -1848,12 +1848,18 @@ function pipeline(pdfText, propertyType, opts, callback) {
             fullLog.push(`[Cost Coverage] ${coverage}% — extracted ₪${sumExtracted.toLocaleString()} vs report ₪${finalReportTotal.toLocaleString()}`);
             const photosLinked = dedupedDefects.filter(d => d.bbox).length;
             fullLog.push(`[Vision] photosLinked=${photosLinked}`);
-            fullLog.push(`[Total] ${Date.now()-t0}ms`);
-            fullLog.push('===================');
-            fullLog.forEach(l => console.log(l));
-            const resultJson = JSON.stringify({ defects: dedupedDefects, reportTotal: finalReportTotal, structureType, analysisLog: fullLog, visionMeta: { pagesScanned: detectVisualPages(pageMeta).length, photosLinked } });
-            cacheSet(finalCacheKey, resultJson);
-            callback(null, resultJson);
+
+            // Step 3e — plain-language simplification
+            const t3e = Date.now();
+            step3e_simplify(dedupedDefects, fullLog, (simplifiedDefects) => {
+              fullLog.push(`[Step 3e] -> ${Date.now()-t3e}ms`);
+              fullLog.push(`[Total] ${Date.now()-t0}ms`);
+              fullLog.push('===================');
+              fullLog.forEach(l => console.log(l));
+              const resultJson = JSON.stringify({ defects: simplifiedDefects, reportTotal: finalReportTotal, structureType, analysisLog: fullLog, visionMeta: { pagesScanned: detectVisualPages(pageMeta).length, photosLinked } });
+              cacheSet(finalCacheKey, resultJson);
+              callback(null, resultJson);
+            });
           }
 
           // Join: merge+finish once vision is done (or after a 90s safety cap).
