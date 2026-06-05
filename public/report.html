@@ -798,7 +798,7 @@ html,body{
 
 <script>
 function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-let D=[],ST={},NT={},RID=null,PT='new',VM='rooms',SF='all',STF='all',WTF='all',PIMGS={},RT=0,LSKEY='';
+let D=[],ST={},NT={},RID=null,PT='new',VM='rooms',SF='all',STF='all',WTF='all',PIMGS={},RT=0,LSKEY='',STR='rooms';
 const SO=['critical','high','medium','low','cosmetic'];
 const SL={critical:'מסוכן',high:'ליקוי הנדסי',medium:'ליקוי בינוני',low:'ליקוי קל',cosmetic:'קוסמטי'};
 const SC2={critical:'C',high:'H',medium:'M',low:'L',cosmetic:'K'};
@@ -878,7 +878,7 @@ function updateDI(){
     }
   }catch{}
   const{reportId:rid,defects,fileName,propType:pt,reportTotal:rt=0,structureType:st='rooms'}=JSON.parse(raw); RT=rt;
-  RID=rid;PT=pt;
+  RID=rid;PT=pt;STR=st;
   D=defects.map((d,i)=>({...d,id:i,sev:SO.includes(d.sev)?d.sev:'medium',cMin:Math.abs(Number(d.cMin)||0),cMax:Math.abs(Number(d.cMax)||0)}));
   D.forEach(d=>ST[d.id]='pending');
   LSKEY='bdkl_state_'+btoa(encodeURIComponent((fileName||'')+D.length)).slice(0,16);
@@ -887,15 +887,10 @@ function updateDI(){
   document.getElementById('hS').textContent=PT==='yad2'?'YAD 2 · מעקב מו"מ':'NEW · דירה חדשה מקבלן';
   // Adapt tabs to report structure type
   const roomsTab=document.querySelector('.vt[onclick*="rooms"]');
-  const catsTab=document.querySelector('.vt[onclick*="categories"]');
   if(st==='systems'||st==='chapters'){
-    // Work-type or chapter organized — rooms view is meaningless, hide it
     document.getElementById('structBadge').classList.add('on');
-    if(roomsTab){roomsTab.style.display='none';roomsTab.classList.remove('on');}
-    if(catsTab){catsTab.classList.add('on');}
-    VM='categories';
+    if(roomsTab)roomsTab.textContent='אזורים';
   }else if(st==='floors'){
-    // Floor-organized — rooms tab stays but rename to "קומות"
     if(roomsTab)roomsTab.textContent='קומות';
   }
   try{
@@ -930,10 +925,26 @@ function buildChips(){
   document.getElementById('FR').innerHTML='';
 }
 
+// ── Room buckets for work-type organized reports ───────────────────────────────
+const ROOM_BUCKETS=[
+  {label:'סלון ופינת אוכל', re:/סלון|מגורים|פינת\s+אוכל|חדר\s+אוכל/},
+  {label:'מטבח',             re:/מטבח/},
+  {label:'שירותים ואמבטיה', re:/שירותים?|אמבטיה|מקלחת|מקלחון/},
+  {label:'חדרי שינה',        re:/חדר\s*שינה|חדר\s*הורים|חדר\s*ילד|חד"ש/},
+  {label:'מסדרון וכניסה',   re:/מסדרון|פרוזדור|כניסה|ממ"ד|מחסן/},
+  {label:'חצר וגג',          re:/חצר|גינה|גג\b|מרפסת|חניה|מרתף/},
+];
+function getBucket(area){
+  const a=area||'';
+  for(const{label,re}of ROOM_BUCKETS)if(re.test(a))return label;
+  return 'כללי';
+}
+
 // ── Room Carousel ─────────────────────────────────────────────────────────────
 function renderRoomGrid(){
+  const useBuckets=STR!=='rooms'&&STR!=='floors';
   const byRoom={};
-  D.forEach(d=>{const r=d.area||'כללי';if(!byRoom[r])byRoom[r]=[];byRoom[r].push(d);});
+  D.forEach(d=>{const r=useBuckets?getBucket(d.area||'כללי'):(d.area||'כללי');if(!byRoom[r])byRoom[r]=[];byRoom[r].push(d);});
   const sevScore=items=>items.reduce((s,d)=>s+(d.sev==='critical'?100:d.sev==='high'?10:d.sev==='medium'?3:1),0);
   const sorted=Object.keys(byRoom).sort((a,b)=>sevScore(byRoom[b])-sevScore(byRoom[a]));
   const cards=sorted.map((room,idx)=>{
