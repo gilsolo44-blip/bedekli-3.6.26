@@ -1685,7 +1685,7 @@ function mergeDefects(textDefects, visionDefects) {
 function pipeline(pdfText, propertyType, opts, callback) {
   if (typeof opts === 'function') { callback = opts; opts = {}; }
   opts = opts || {};
-  const { pdfBase64 = null, pageMeta = null } = opts;
+  const { pdfBase64 = null, pageMeta = null, nocache = false } = opts;
   groqKeyExhausted.clear();
   const t0 = Date.now();
   const fullLog = [];
@@ -1693,7 +1693,7 @@ function pipeline(pdfText, propertyType, opts, callback) {
 
   // Final result cache — same PDF always returns same result (vision-aware key)
   const finalCacheKey = `result_${pdfHash(pdfText)}_${propertyType || 'new'}_${detectVisualPages(pageMeta).length ? 'v' : 't'}`;
-  const cachedResult = cacheGet(finalCacheKey);
+  const cachedResult = nocache ? null : cacheGet(finalCacheKey);
   if (cachedResult) {
     fullLog.push('[Cache] hit — returning cached analysis');
     fullLog.forEach(l => console.log(l));
@@ -1900,7 +1900,10 @@ function pipeline(pdfText, propertyType, opts, callback) {
               fullLog.push('===================');
               fullLog.forEach(l => console.log(l));
               const resultJson = JSON.stringify({ defects: simplifiedDefects, reportTotal: finalReportTotal, structureType, analysisLog: fullLog, visionMeta: { pagesScanned: detectVisualPages(pageMeta).length, photosLinked } });
-              cacheSet(finalCacheKey, resultJson);
+              // אל תשמור cache כשstep3e נכשל לגמרי — מונע הגשת תוצאות ישנות ללא simplified_explanation
+              const _simplifyOk = simplifiedDefects.length === 0 ||
+                simplifiedDefects.some(d => d.simplified_explanation && d.simplified_explanation.trim());
+              if (_simplifyOk) cacheSet(finalCacheKey, resultJson);
               callback(null, resultJson);
             });
           }
@@ -1927,7 +1930,7 @@ http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
-  if (req.method === 'POST' && req.url === '/api/analyze-simple') {
+  if (req.method === 'POST' && (req.url === '/api/analyze-simple' || req.url.startsWith('/api/analyze-simple?'))) {
     const body = [];
     let bodyBytes = 0;
     const MAX_BODY = 100 * 1024 * 1024; // 100 MB raw guard
@@ -1942,7 +1945,7 @@ http.createServer((req, res) => {
     });
     req.on('end', () => {
       try {
-        const { pdfText, propertyType, pdfBase64, pageMeta } = JSON.parse(Buffer.concat(body).toString('utf8'));
+        const { pdfText, propertyType, pdfBase64, pageMeta, nocache } = JSON.parse(Buffer.concat(body).toString('utf8'));
         if (!pdfText && !pdfBase64) { res.writeHead(400,{'Content-Type':'application/json'}); return res.end(JSON.stringify({error:'Missing PDF text or base64'})); }
         if (pdfText.length > 2000000) {
           res.writeHead(413, {'Content-Type': 'application/json'});
@@ -1951,7 +1954,7 @@ http.createServer((req, res) => {
         const hasAnyKey = GROQ_KEYS.length || CEREBRAS_KEY || GEMINI_KEY || OPENROUTER_KEY;
         if (!hasAnyKey) { res.writeHead(500,{'Content-Type':'application/json'}); return res.end(JSON.stringify({error:'חסרים API keys ב-.env.local'})); }
 
-        pipeline(pdfText, propertyType, { pdfBase64, pageMeta }, (err, raw) => {
+        pipeline(pdfText, propertyType, { pdfBase64, pageMeta, nocache: !!nocache }, (err, raw) => {
           if (err) { console.error('שגיאה:', err.message); res.writeHead(502,{'Content-Type':'application/json'}); return res.end(JSON.stringify({error:err.message})); }
           res.writeHead(200,{'Content-Type':'application/json'});
           res.end(raw);

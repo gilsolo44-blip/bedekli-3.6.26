@@ -166,5 +166,35 @@
     "confidence": 0.85,
     "first_seen": "2026-06-05",
     "file_count": 1
+  },
+  "תאריך\n \nדו\"ח": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-05",
+    "file_count": 1
+  },
+  "דב דוד": {
+    "archetype": "NUMBERED_FLAT",
+    "confidence": 0.8,
+    "first_seen": "2026-06-05",
+    "file_count": 1
+  },
+  "עקרונות מנחים לחוות דעתי ו": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-05",
+    "file_count": 1
+  },
+  "והאדריכליים  ואינה": {
+    "archetype": "KW_PARAGRAPH",
+    "confidence": 0.85,
+    "first_seen": "2026-06-05",
+    "file_count": 1
+  },
+  "חוות דעת הנדסית \n \n שם\nהמזמי\nנים": {
+    "archetype": "NUMBERED_FLAT",
+    "confidence": 0.8,
+    "first_seen": "2026-06-05",
+    "file_count": 1
   }
 }
