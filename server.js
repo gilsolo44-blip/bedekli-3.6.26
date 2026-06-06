@@ -1780,8 +1780,9 @@ function pipeline(pdfText, propertyType, opts, callback) {
         if (visionMap && visionMap.sections && visionMap.sections.length) {
           sectionMap = visionMap;
           fullLog.push(`[Step 1] -> vision structure: ${sectionMap.sections.length} סקשנים`);
-          // Scanned PDF: text is empty — run per-section vision extraction for defects
-          if (!cleanText.trim()) {
+          // Scanned PDF: text is empty or nearly empty — run per-section vision extraction for defects
+          const usablePageCount = Object.values(cleanPageMap).filter(t => t && t.trim().length > 50).length;
+          if (!cleanText.trim() || usablePageCount < 2) {
             return scanExtractPerSection(pdfBase64, sectionMap.sections, fullLog, (scanDefects) => {
               // Inject scan results as vision defects so _afterVision picks them up
               _visionDefects = step4_schema(scanDefects);
