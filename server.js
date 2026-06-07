@@ -82,7 +82,7 @@ const GEMINI_KEYS = [
 ].filter(Boolean);
 let geminiKeyIdx = 0;
 const geminiKeyExhausted = new Set();
-const GEMINI_KEY = GEMINI_KEYS[0] || null; // vision functions use primary key
+const GEMINI_KEY = GEMINI_KEYS[0] || null; // provider check() — vision functions now use rotation
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
 // ── Vision (multimodal) config ───────────────────────────────────────────────
@@ -946,12 +946,20 @@ function geminiCall(model, system, user, callback, attempt = 1) {
 // ── Gemini Files API ─────────────────────────────────────────────────────────
 // Resumable upload of a base64 PDF. Returns { uri, name } via callback.
 function geminiUploadFile(pdfBase64, callback) {
-  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+  // Pick the first non-exhausted key. Files API files are tied to their upload key,
+  // so we rotate here (on 429) and carry the chosen key through extraction + delete.
+  let keyIdx = -1, key = null;
+  for (let i = 0; i < GEMINI_KEYS.length; i++) {
+    const idx = (geminiKeyIdx + i) % GEMINI_KEYS.length;
+    if (!geminiKeyExhausted.has(idx)) { keyIdx = idx; key = GEMINI_KEYS[idx]; break; }
+  }
+  if (!key) return callback(new Error('All Gemini keys exhausted'));
+  geminiKeyIdx = keyIdx;
   const buf = Buffer.from(pdfBase64, 'base64');
   const startBody = JSON.stringify({ file: { display_name: 'inspection.pdf' } });
   const startOpts = {
     hostname: 'generativelanguage.googleapis.com',
-    path: `/upload/v1beta/files?key=${GEMINI_KEY}`,
+    path: `/upload/v1beta/files?key=${key}`,
     method: 'POST',
     headers: {
       'X-Goog-Upload-Protocol': 'resumable',
@@ -965,6 +973,11 @@ function geminiUploadFile(pdfBase64, callback) {
   const startReq = https.request(startOpts, (resp) => {
     const uploadUrl = resp.headers['x-goog-upload-url'];
     resp.on('data', () => {}); resp.on('end', () => {
+      if (resp.statusCode === 429) {
+        geminiKeyExhausted.add(keyIdx);
+        geminiKeyIdx = (keyIdx + 1) % GEMINI_KEYS.length;
+        return geminiUploadFile(pdfBase64, callback);
+      }
       if (!uploadUrl) return callback(new Error('Files API: no upload URL (status ' + resp.statusCode + ')'));
       const u = new URL(uploadUrl);
       const upOpts = {
@@ -980,7 +993,7 @@ function geminiUploadFile(pdfBase64, callback) {
           try {
             const js = JSON.parse(body);
             if (!js.file || !js.file.uri) return callback(new Error('Files API finalize failed: ' + body.slice(0, 120)));
-            callback(null, { uri: js.file.uri, name: js.file.name });
+            callback(null, { uri: js.file.uri, name: js.file.name, key, keyIdx });
           } catch (e) { callback(e); }
         });
       });
@@ -993,11 +1006,12 @@ function geminiUploadFile(pdfBase64, callback) {
 }
 
 // Proactive cleanup — best-effort, errors ignored.
-function geminiDeleteFile(name, callback) {
-  if (!GEMINI_KEY || !name) return callback && callback();
+function geminiDeleteFile(name, key, callback) {
+  const k = key || GEMINI_KEYS[0];
+  if (!k || !name) return callback && callback();
   const opts = {
     hostname: 'generativelanguage.googleapis.com',
-    path: `/v1beta/${name}?key=${GEMINI_KEY}`, method: 'DELETE',
+    path: `/v1beta/${name}?key=${k}`, method: 'DELETE',
   };
   const req = https.request(opts, (r) => { r.on('data', () => {}); r.on('end', () => callback && callback()); });
   req.on('error', () => callback && callback());
@@ -1012,8 +1026,8 @@ const VISION_PROMPT = `אתה מנתח דוח בדק-בית בעברית מתו�
 {"defects":[{"t":"כותרת קצרה","ds":"תיאור","s":"critical|high|medium|low|cosmetic","p":מספר_עמוד,"c":"עלות אם מופיעה","rec":"פעולה נדרשת","q":"ציטוט/מהתמונה","area":"שם החדר/אזור","bbox":[ymin,xmin,ymax,xmax]}]}`;
 
 // Extract defects from a PDF already uploaded to Files API. Gemini-only (Files API).
-function geminiVisionExtract(fileUri, visualPages, propertyType, callback, attempt = 1) {
-  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+function geminiVisionExtract(fileUri, visualPages, propertyType, key, callback, attempt = 1) {
+  if (!key) return callback(new Error('No Gemini key'));
   const prompt = VISION_PROMPT.replace('{PAGES}', visualPages.join(', '));
   const body = JSON.stringify({
     contents: [{ role: 'user', parts: [
@@ -1024,16 +1038,16 @@ function geminiVisionExtract(fileUri, visualPages, propertyType, callback, attem
   });
   postJSON({
     hostname: 'generativelanguage.googleapis.com',
-    path: `/v1beta/models/${VISION.model}:generateContent?key=${GEMINI_KEY}`,
+    path: `/v1beta/models/${VISION.model}:generateContent?key=${key}`,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
   }, body, (err, status, text) => {
     if (err) return callback(err);
     if (status === 429 && attempt === 1) {
-      return setTimeout(() => geminiVisionExtract(fileUri, visualPages, propertyType, callback, 2), 8000);
+      return setTimeout(() => geminiVisionExtract(fileUri, visualPages, propertyType, key, callback, 2), 8000);
     }
     if (status === 503 && attempt <= 2) {
-      return setTimeout(() => geminiVisionExtract(fileUri, visualPages, propertyType, callback, attempt + 1), 4000 * attempt);
+      return setTimeout(() => geminiVisionExtract(fileUri, visualPages, propertyType, key, callback, attempt + 1), 4000 * attempt);
     }
     if (status !== 200) return callback(new Error('Vision ' + status + ': ' + text.slice(0, 100)));
     try {
@@ -1052,8 +1066,8 @@ const SCAN_SECTION_PROMPT = `אתה מנתח דוח בדק-בית סרוק. חל
 {"defects":[{"t":"כותרת קצרה","ds":"תיאור מלא","s":"critical|high|medium|low|cosmetic","p":מספר_עמוד,"c":"עלות אם מופיעה","rec":"פעולה נדרשת","area":"{ROOM}","bbox":[...] or null}]}`;
 
 // Extract defects from a single section of a scanned PDF (reuses uploaded fileUri).
-function geminiVisionExtractSection(fileUri, sectionName, pages, callback, attempt = 1) {
-  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+function geminiVisionExtractSection(fileUri, sectionName, pages, key, callback, attempt = 1) {
+  if (!key) return callback(new Error('No Gemini key'));
   const prompt = SCAN_SECTION_PROMPT
     .replace(/{PAGES}/g, pages.join(', '))
     .replace(/{ROOM}/g, sectionName);
@@ -1066,13 +1080,13 @@ function geminiVisionExtractSection(fileUri, sectionName, pages, callback, attem
   });
   postJSON({
     hostname: 'generativelanguage.googleapis.com',
-    path: `/v1beta/models/${VISION.model}:generateContent?key=${GEMINI_KEY}`,
+    path: `/v1beta/models/${VISION.model}:generateContent?key=${key}`,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
   }, body, (err, status, text) => {
     if (err) return callback(err);
     if ((status === 429 || status === 503) && attempt <= 2) {
-      return setTimeout(() => geminiVisionExtractSection(fileUri, sectionName, pages, callback, attempt + 1), 8000 * attempt);
+      return setTimeout(() => geminiVisionExtractSection(fileUri, sectionName, pages, key, callback, attempt + 1), 8000 * attempt);
     }
     if (status !== 200) return callback(new Error('ScanSection ' + status + ': ' + text.slice(0, 120)));
     try {
@@ -1096,7 +1110,7 @@ function scanExtractPerSection(pdfBase64, sections, log, callback) {
     const SCAN_CONC = 2;
     function finish() {
       if (finished) return; finished = true;
-      geminiDeleteFile(file.name, () => {});
+      geminiDeleteFile(file.name, file.key, () => {});
       log.push(`[ScanExtract] ✓ ${allDefects.length} ליקויים מ-${sections.length} סקשנים`);
       callback(allDefects);
     }
@@ -1106,7 +1120,7 @@ function scanExtractPerSection(pdfBase64, sections, log, callback) {
         const pages = [];
         for (let p = sec.startPage; p <= sec.endPage; p++) pages.push(p);
         pending++;
-        geminiVisionExtractSection(file.uri, sec.name, pages, (err, defs) => {
+        geminiVisionExtractSection(file.uri, sec.name, pages, file.key, (err, defs) => {
           pending--;
           if (err) log.push(`[ScanExtract] ✗ ${sec.name}: ${err.message}`);
           else { log.push(`[ScanExtract] ${sec.name}: ${(defs||[]).length} ליקויים`); allDefects.push(...(defs||[])); }
@@ -1135,8 +1149,8 @@ function visionPath(pdfBase64, pageMeta, propertyType, log, callback) {
   geminiUploadFile(pdfBase64, (upErr, file) => {
     if (upErr) { log.push('[Vision] ✗ upload: ' + upErr.message); return callback(null, []); }
     log.push('[Vision] upload ok');
-    geminiVisionExtract(file.uri, visualPages, propertyType, (exErr, rawDefects) => {
-      geminiDeleteFile(file.name, () => {});
+    geminiVisionExtract(file.uri, visualPages, propertyType, file.key, (exErr, rawDefects) => {
+      geminiDeleteFile(file.name, file.key, () => {});
       if (exErr) { log.push('[Vision] ✗ extract: ' + exErr.message); return callback(null, []); }
       const defects = step4_schema(rawDefects || []);
       const withBox = defects.filter(d => d.bbox).length;
@@ -1154,8 +1168,8 @@ const VISION_STRUCT_PROMPT = `אתה מנתח דוח בדק-בית סרוק (PDF
 החזר JSON בלבד, ללא backticks:
 {"sections":[{"name":"שם החדר/אזור","startPage":מספר,"endPage":מספר}]}`;
 
-function geminiVisionStructure(fileUri, cleanText, callback, attempt = 1) {
-  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+function geminiVisionStructure(fileUri, cleanText, key, callback, attempt = 1) {
+  if (!key) return callback(new Error('No Gemini key'));
   const body = JSON.stringify({
     contents: [{ role: 'user', parts: [
       { fileData: { fileUri, mimeType: 'application/pdf' } },
@@ -1165,13 +1179,13 @@ function geminiVisionStructure(fileUri, cleanText, callback, attempt = 1) {
   });
   postJSON({
     hostname: 'generativelanguage.googleapis.com',
-    path: `/v1beta/models/${VISION.model}:generateContent?key=${GEMINI_KEY}`,
+    path: `/v1beta/models/${VISION.model}:generateContent?key=${key}`,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
   }, body, (err, status, text) => {
     if (err) return callback(err);
-    if (status === 429 && attempt === 1) return setTimeout(() => geminiVisionStructure(fileUri, cleanText, callback, 2), 8000);
-    if (status === 503 && attempt <= 2) return setTimeout(() => geminiVisionStructure(fileUri, cleanText, callback, attempt + 1), 4000 * attempt);
+    if (status === 429 && attempt === 1) return setTimeout(() => geminiVisionStructure(fileUri, cleanText, key, callback, 2), 8000);
+    if (status === 503 && attempt <= 2) return setTimeout(() => geminiVisionStructure(fileUri, cleanText, key, callback, attempt + 1), 4000 * attempt);
     if (status !== 200) return callback(new Error('VisionStruct ' + status + ': ' + text.slice(0, 100)));
     try {
       const js = JSON.parse(text);
@@ -1188,8 +1202,8 @@ function visionStructurePath(pdfBase64, pageMeta, cleanText, log, callback) {
   log.push('[VisionStruct] text-step1 failed — deriving structure from scanned pages');
   geminiUploadFile(pdfBase64, (upErr, file) => {
     if (upErr) { log.push('[VisionStruct] ✗ upload: ' + upErr.message); return callback(null); }
-    geminiVisionStructure(file.uri, cleanText, (exErr, sectionMap) => {
-      geminiDeleteFile(file.name, () => {});
+    geminiVisionStructure(file.uri, cleanText, file.key, (exErr, sectionMap) => {
+      geminiDeleteFile(file.name, file.key, () => {});
       if (exErr || !sectionMap || !sectionMap.sections || !sectionMap.sections.length) {
         log.push('[VisionStruct] ✗ ' + (exErr ? exErr.message : 'no sections'));
         return callback(null);
