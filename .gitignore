@@ -8,3 +8,4 @@ node_modules/
 *.pdf
 *.bat
 shared/analysis_cache/
+docs/pricing/
