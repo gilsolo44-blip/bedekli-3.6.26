@@ -201,17 +201,14 @@ const STRUCT_PROMPT = `אתה מנתח מסמך בדק-בית. משימתך: ל�
 
 התאם את הפלט למה שאתה רואה בפועל — לא לדוגמאות להלן.
 
-דוגמה א׳ — דירה 25 עמ', לפי חדרים:
-{"sections":[{"name":"כניסה","startPage":3,"endPage":6},{"name":"סלון","startPage":7,"endPage":12},{"name":"מטבח","startPage":13,"endPage":18},{"name":"חדר שינה","startPage":19,"endPage":25}],"costTablePages":[],"reportTotal":0}
+דוגמה א׳ — דירה 121 עמ', לפי חדרים (24 sections, מדוח אמיתי):
+{"sections":[{"name":"כניסה לדירה","startPage":4,"endPage":9},{"name":"עבודות טיח וצבע","startPage":10,"endPage":13},{"name":"אביזרי חשמל ותקשורת/בטיחות","startPage":14,"endPage":16},{"name":"מטבח","startPage":17,"endPage":19},{"name":"חדר דיור (סלון)","startPage":20,"endPage":25},{"name":"מרפסת חדר דיור","startPage":26,"endPage":36},{"name":"עבודות אבן טבעית","startPage":37,"endPage":38},{"name":"שירותי אורחים","startPage":39,"endPage":43},{"name":"אינסטלציה","startPage":44,"endPage":45},{"name":"ריצוף","startPage":46,"endPage":48},{"name":"עבודות איטום וליקויי רטיבות","startPage":49,"endPage":50},{"name":"אינסטלציה סניטרית וניקוז","startPage":51,"endPage":53},{"name":"חיפוי קרמיקה","startPage":53,"endPage":53},{"name":"ניקיון","startPage":54,"endPage":54},{"name":"חדר ילדים ליד חדר רחצה כללי","startPage":55,"endPage":60},{"name":"מרפסת חדרי ילדים","startPage":61,"endPage":69},{"name":"חדר רחצה כללי","startPage":70,"endPage":77},{"name":"נגרות","startPage":78,"endPage":78},{"name":"מסתור כביסה","startPage":79,"endPage":85},{"name":"מבואת ממ\"ד","startPage":86,"endPage":86},{"name":"ממ\"ד","startPage":87,"endPage":95},{"name":"חדר ילדים ליד חדר הורים","startPage":96,"endPage":104},{"name":"חדר הורים","startPage":105,"endPage":111},{"name":"חדר רחצה הורים","startPage":112,"endPage":121}],"costTablePages":[],"reportTotal":0}
 
-דוגמה ב׳ — בית 40 עמ', לפי מערכות:
-{"sections":[{"name":"ריצוף","startPage":4,"endPage":14},{"name":"חשמל","startPage":15,"endPage":24},{"name":"אינסטלציה","startPage":25,"endPage":38}],"costTablePages":[39,40],"reportTotal":85000}
+דוגמה ב׳ — 40 עמ', לפי מערכות (5 sections, מדוח אמיתי):
+{"sections":[{"name":"שלד ובניה","startPage":1,"endPage":8},{"name":"מערכות רטובות","startPage":9,"endPage":16},{"name":"מערכות יבשות","startPage":17,"endPage":24},{"name":"גמרים","startPage":25,"endPage":37},{"name":"ממצאים כלליים","startPage":38,"endPage":40}],"costTablePages":[],"reportTotal":0}
 
-דוגמה ג׳ — בניין מסחרי 15 עמ', לפי קומות:
-{"sections":[{"name":"קומת קרקע","startPage":2,"endPage":5},{"name":"קומה ראשונה","startPage":6,"endPage":10},{"name":"גג ותשתיות","startPage":11,"endPage":15}],"costTablePages":[],"reportTotal":42000}
-
-דוגמה ד׳ — דירה 51 עמ', פרקים ממוספרים (.1 עבודות X, .2 עבודות Y):
-{"sections":[{"name":"עבודות שלד ובניה","startPage":5,"endPage":11},{"name":"עבודות נגרות","startPage":12,"endPage":18},{"name":"עבודות מסגרות","startPage":19,"endPage":27},{"name":"עבודות חיפוי קרמיקה","startPage":28,"endPage":35},{"name":"עבודות חשמל","startPage":36,"endPage":42},{"name":"עבודות שליכט וצבע","startPage":43,"endPage":47},{"name":"עבודות ריצוף","startPage":48,"endPage":51}],"costTablePages":[],"reportTotal":0}`;
+דוגמה ג׳ — 16 עמ', עם טבלת עלויות ו-reportTotal (4 sections, מדוח אמיתי):
+{"sections":[{"name":"ממצאים חיצוניים","startPage":4,"endPage":8},{"name":"מערכות ופתחים","startPage":9,"endPage":10},{"name":"פנים הדירה וחדרים רטובים","startPage":11,"endPage":14},{"name":"צנרת וביוב","startPage":15,"endPage":15}],"costTablePages":[16],"reportTotal":220020}`;
 
 const OUTLINE_MAX = 5000; // chars — keeps step1 prompt below Groq's 6144-token output window
 
