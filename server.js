@@ -1428,7 +1428,7 @@ function step0c_detectArchetype(cleanText) {
   return result;
 }
 
-function buildArchetypeBlock(rules, companyName) {
+function buildArchetypeBlock(rules, companyName, archetype) {
   const parts = [];
   if (rules.delimiter_pattern) parts.push(`[סימן גבול ליקוי: ${rules.delimiter_pattern}]`);
   if (rules.extraction_hints && rules.extraction_hints.length)
@@ -1439,7 +1439,7 @@ function buildArchetypeBlock(rules, companyName) {
   }
   if (companyName && companyName !== 'unknown') {
     _ensureCompanyMemory();
-    const companyBlock = _companyMemory.buildFewShotBlock(companyName);
+    const companyBlock = _companyMemory.buildFewShotBlock(companyName, archetype);
     if (companyBlock) parts.push(companyBlock);
   }
   return parts.join('\n');
@@ -1556,7 +1556,7 @@ function step3_extract(byRoom, costMap, callback, archetype, companyName) {
   const allDefects = [];
   const tasks = buildStep3Tasks(byRoom, costMap, archetype);
   const _arcRules = getArchetypeRules(archetype || 'UNKNOWN');
-  const _arcBlock = buildArchetypeBlock(_arcRules, companyName);
+  const _arcBlock = buildArchetypeBlock(_arcRules, companyName, archetype);
   let nextIdx = 0;
   let pending = 0;
   const results = new Array(tasks.length);
