@@ -12,6 +12,11 @@ function _ensureDetector() {
   }
 }
 
+let _companyMemory;
+function _ensureCompanyMemory() {
+  if (!_companyMemory) _companyMemory = require('./lib/companyMemory');
+}
+
 let _archetypeRules;
 function getArchetypeRules(archetype) {
   if (!_archetypeRules) _archetypeRules = require('./lib/archetypeRules');
@@ -1394,10 +1399,12 @@ function step0c_detectArchetype(cleanText) {
   _ensureDetector();
   const profiles = _archetypeDetector.loadProfiles();
   const companyName = _archetypeDetector.extractCompanyName(cleanText.slice(0, 800), profiles);
-  return _archetypeDetector.detectArchetypeSync(cleanText, companyName);
+  const result = _archetypeDetector.detectArchetypeSync(cleanText, companyName);
+  result.companyName = companyName;
+  return result;
 }
 
-function buildArchetypeBlock(rules) {
+function buildArchetypeBlock(rules, companyName) {
   const parts = [];
   if (rules.delimiter_pattern) parts.push(`[סימן גבול ליקוי: ${rules.delimiter_pattern}]`);
   if (rules.extraction_hints && rules.extraction_hints.length)
@@ -1405,6 +1412,11 @@ function buildArchetypeBlock(rules) {
   if (rules.cost_location) parts.push(`[מיקום מחיר: ${rules.cost_location}]`);
   if (rules.few_shot && rules.few_shot.input) {
     parts.push(`\nדוגמה:\n--- קלט ---\n${rules.few_shot.input}\n--- פלט ---\n${JSON.stringify(rules.few_shot.output)}\n---`);
+  }
+  if (companyName && companyName !== 'unknown') {
+    _ensureCompanyMemory();
+    const companyBlock = _companyMemory.buildFewShotBlock(companyName);
+    if (companyBlock) parts.push(companyBlock);
   }
   return parts.join('\n');
 }
@@ -1515,12 +1527,12 @@ function step3e_simplify(defects, log, callback) {
   nextBatch();
 }
 
-function step3_extract(byRoom, costMap, callback, archetype) {
+function step3_extract(byRoom, costMap, callback, archetype, companyName) {
   const log = [];
   const allDefects = [];
   const tasks = buildStep3Tasks(byRoom, costMap, archetype);
   const _arcRules = getArchetypeRules(archetype || 'UNKNOWN');
-  const _arcBlock = buildArchetypeBlock(_arcRules);
+  const _arcBlock = buildArchetypeBlock(_arcRules, companyName);
   let nextIdx = 0;
   let pending = 0;
   const results = new Array(tasks.length);
@@ -1719,7 +1731,7 @@ function pipeline(pdfText, propertyType, opts, callback) {
 
   // Step 0c — archetype detection
   const archetypeProfile = step0c_detectArchetype(cleanText);
-  fullLog.push(`[Step 0c] archetype=${archetypeProfile.archetype} confidence=${archetypeProfile.confidence}${archetypeProfile.fromCache ? ' (cache)' : ''}`);
+  fullLog.push(`[Step 0c] archetype=${archetypeProfile.archetype} confidence=${archetypeProfile.confidence}${archetypeProfile.fromCache ? ' (cache)' : ''} company=${archetypeProfile.companyName}`);
 
   // Build cleanPageMap (shared by step2b and cost-context)
   const cleanPages = cleanText.split(/---\s*עמוד\s*(\d+)\s*---/);
@@ -1905,6 +1917,10 @@ function pipeline(pdfText, propertyType, opts, callback) {
               const _simplifyOk = simplifiedDefects.length === 0 ||
                 simplifiedDefects.some(d => d.simplified_explanation && d.simplified_explanation.trim());
               if (_simplifyOk) cacheSet(finalCacheKey, resultJson);
+              if (_simplifyOk && archetypeProfile.companyName) {
+                _ensureCompanyMemory();
+                _companyMemory.saveDefects(archetypeProfile.companyName, simplifiedDefects, archetypeProfile.archetype);
+              }
               callback(null, resultJson);
             });
           }
@@ -1917,7 +1933,7 @@ function pipeline(pdfText, propertyType, opts, callback) {
           }
         }); // end step3d
       });
-    }, archetypeProfile.archetype);
+    }, archetypeProfile.archetype, archetypeProfile.companyName);
     } // end runPipeline
   }, archetypeProfile.hint);
 }
