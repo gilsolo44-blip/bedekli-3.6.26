@@ -75,7 +75,14 @@ let groqKeyIdx = 0;
 const groqKeyExhausted = new Set();
 
 const CEREBRAS_KEY   = process.env.CEREBRAS_API_KEY;
-const GEMINI_KEY     = process.env.GEMINI_API_KEY;
+const GEMINI_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+].filter(Boolean);
+let geminiKeyIdx = 0;
+const geminiKeyExhausted = new Set();
+const GEMINI_KEY = GEMINI_KEYS[0] || null; // vision functions use primary key
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 
 // ── Vision (multimodal) config ───────────────────────────────────────────────
@@ -110,7 +117,7 @@ if (!GROQ_KEYS.length && !CEREBRAS_KEY && !GEMINI_KEY && !OPENROUTER_KEY) {
   console.error('[AUTH_LOCKED] ✗ No API keys found — check .env.local');
   process.exit(1);
 }
-console.log(`[AUTH_LOCKED] Provider keys verified — GROQ:${GROQ_KEYS.length} CEREBRAS:${!!CEREBRAS_KEY} GEMINI:${!!GEMINI_KEY} OPENROUTER:${!!OPENROUTER_KEY}`);
+console.log(`[AUTH_LOCKED] Provider keys verified — GROQ:${GROQ_KEYS.length} CEREBRAS:${!!CEREBRAS_KEY} GEMINI:${GEMINI_KEYS.length} OPENROUTER:${!!OPENROUTER_KEY}`);
 
 // ── Step 0: Cost Pre-extraction (JavaScript only) ────────────────────────────
 
@@ -902,7 +909,13 @@ function cerebrasCall(model, system, user, callback, attempt = 1) {
 // ── Provider: Gemini (Google AI Studio) ──────────────────────────────────────
 
 function geminiCall(model, system, user, callback, attempt = 1) {
-  if (!GEMINI_KEY) return callback(new Error('No Gemini key'));
+  let key = null;
+  let keyIdx = -1;
+  for (let i = 0; i < GEMINI_KEYS.length; i++) {
+    const idx = (geminiKeyIdx + i) % GEMINI_KEYS.length;
+    if (!geminiKeyExhausted.has(idx)) { geminiKeyIdx = idx; keyIdx = idx; key = GEMINI_KEYS[idx]; break; }
+  }
+  if (!key) return callback(new Error('Gemini exhausted'));
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts: [{ text: user }] }],
@@ -910,16 +923,16 @@ function geminiCall(model, system, user, callback, attempt = 1) {
   });
   postJSON({
     hostname: 'generativelanguage.googleapis.com',
-    path: `/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+    path: `/v1beta/models/${model}:generateContent?key=${key}`,
     method: 'POST',
     headers: { 'Content-Type':'application/json', 'Content-Length':Buffer.byteLength(body) }
   }, body, (err, status, text) => {
     if (err) return callback(err);
     if (status === 429) {
-      // Single retry with 8s — fail fast so tryProviders can move to next model
-      // (providerCooldown in tryProviders prevents re-trying this model for 65s)
       if (attempt === 1) return setTimeout(() => geminiCall(model, system, user, callback, 2), 8000);
-      return callback(new Error('Gemini 429 rate-limited'));
+      // Second 429 on this key — exhaust it and rotate to next
+      geminiKeyExhausted.add(keyIdx);
+      return geminiCall(model, system, user, callback, 1);
     }
     if (status === 503 && attempt <= 2) {
       return setTimeout(() => geminiCall(model, system, user, callback, attempt + 1), 4000 * attempt);
@@ -1699,6 +1712,7 @@ function pipeline(pdfText, propertyType, opts, callback) {
   opts = opts || {};
   const { pdfBase64 = null, pageMeta = null, nocache = false } = opts;
   groqKeyExhausted.clear();
+  geminiKeyExhausted.clear();
   const t0 = Date.now();
   const fullLog = [];
   fullLog.push('=== ROUTING LOG ===');
